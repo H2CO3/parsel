@@ -7,6 +7,7 @@
 use core::iter::FromIterator;
 use core::convert::TryFrom;
 use core::str::FromStr;
+use core::num::NonZeroUsize;
 use core::hash::{Hash, Hasher};
 use core::ops::{Deref, DerefMut, Index, IndexMut};
 use core::fmt::{self, Debug, Display, Formatter};
@@ -1155,6 +1156,14 @@ impl<T, P> Punctuated<T, P> {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
     pub fn into_inner(self) -> syn::punctuated::Punctuated<T, P> {
         self.inner
     }
@@ -1440,6 +1449,10 @@ pub struct Separated<T, P> {
 }
 
 impl<T, P> Separated<T, P> {
+    pub fn len(&self) -> NonZeroUsize {
+        NonZeroUsize::new(self.inner.len()).expect("empty Separated")
+    }
+
     pub fn into_inner(self) -> syn::punctuated::Punctuated<T, P> {
         self.inner
     }
@@ -1528,7 +1541,7 @@ impl<T, P> Separated<T, P> {
     /// ```
     pub fn into_first_rest(self) -> (T, Vec<(P, T)>) {
         // this subtraction cannot overflow: `self` is never empty
-        let mut pairs = Vec::with_capacity(self.len() - 1);
+        let mut pairs = Vec::with_capacity(self.len().get() - 1);
         let mut iter = self.into_pairs();
         let pair = iter.next().expect("empty Separated");
 
@@ -1573,7 +1586,7 @@ impl<T, P> Separated<T, P> {
     /// ```
     pub fn into_last_rest(self) -> (T, Vec<(T, P)>) {
         // this subtraction cannot overflow: `self` is never empty
-        let mut pairs = Vec::with_capacity(self.len() - 1);
+        let mut pairs = Vec::with_capacity(self.len().get() - 1);
 
         for pair in self.into_pairs() {
             match pair {

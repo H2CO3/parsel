@@ -265,12 +265,12 @@ terms to the left. There are two ways to achieve this goal:
    of creating binary AST nodes. The repeated AST nodes will be sub-expressions
    at the next highest precedence level. This approach puts off the question of
    associativity until evaluation/codegen, that is, until tree-walking time.
-2. Use the [`LeftAssoc`](ast/enum.LeftAssoc.html) helper type. This sidesteps the
+2. Use the [`LeftAssoc`](ast/enum.LeftAssoc.html) helper type. This solves the
    problem of infinite recursion by parsing iteratively (just like `Separated`).
-   It then transform the resulting linear list of subexpressions into a properly
+   It then transforms the resulting linear list of subexpressions into a properly
    left-associative (left-leaning) tree of AST nodes.
 
-   Note that there is an analogous [`RightAssoc` type](ast/enum.RightAssoc.html)
+   Note that there is an analogous [`RightAssoc`](ast/enum.RightAssoc.html) type
    as well. Strictly speaking, this is not *necessary,* because right recursion
    makes progress and terminates just fine. However, deriving the parse tree in
    an iterative manner has the advantage of recursing less, and including the
@@ -306,58 +306,6 @@ not when used on e.g. a `TokenStream` obtained via `quote!()` or `parse_quote!()
 
 ### Roadmap, TODOs
 
-* [x] Configure and use Clippy
-* [x] Add tests for various scenarios
-  * [x] Parsing of simple named-field `struct` succeeds
-  * [x] Parsing of simple tuple `struct` succeeds
-  * [x] Parsing of `enum` with multiple kinds of variants succeeds
-  * [x] Parsing a generic `struct` succeeds (named-field as well as tuple)
-  * [x] Parsing a generic `enum` succeeds (with multiple kinds of variants)
-  * [x] Parsing of complex tree of mutually recursive types succeeds
-  * [x] Printing of simple named-field `struct` succeeds
-  * [x] Printing of simple tuple `struct` succeeds
-  * [x] Priting of `enum` with multiple kinds of variants succeeds
-  * [x] Printing of a generic `struct` succeeds
-  * [x] Printing of a generic `enum` with multiple kinds of variants succeeds
-  * [x] Printing of complex tree of mutually recursive types succeeds
-  * [x] Round-trip smoke tests: `parse(print(ast)) == ast && print(parse(ts)) == ts`
-* [x] Handle generic AST node types
-* [x] Refactor into modules
-* [x] Add `pub extern crate proc_macro2;`, `pub extern crate syn;` as well as
-     `pub extern crate quote;` to the crate root
-  * [x] Rewrite derive macros so that they reference `::parsel::proc_macro2`,
-        `::parsel::syn::*` and `::parsel::quote::*` instead of referring to the three
-        crates directly. This allows one to use the `#[derive]` macros on their own,
-        without having to declare and import these dependencies manually.
-  * [x] Also rewrite examples and tests with this in mind
-* [x] Add helper types for common tasks/production kinds
-  * [x] `Punctuated` and `Many`: at least 0 repetitions, trailing punctuation allowed
-  * [x] `Separated`: at least 1 repetition, trailing punctuation **not** allowed
-  * [x] `Maybe`: 0 or 1 repetition, checkig a prefix for deciding if the suffix exists
-  * [x] `Lit`, `Bool`, `Int`, `Float`, `Str`: strongly-typed, pre-parsed counterparts to
-         `syn::Lit`, `syn::LitBool` etc.
-  * [x] `LeftAssoc`: for parsing left-associative binary infix operators without
-        infinite left recursion, and transforming them into a proper, left-leaning AST
-  * [x] `RightAssoc`: for parsing right-associative binary infix operators without
-        deep right recursion
-  * [x] Rewrite tests using these helper types once they are added
-* [x] Implement `#[derive(FromStr)]` (trivial: delegates to `syn::parse_str()`)
-* [x] Implement `#[derive(Display)]` (trivial: delegates to `ToTokens::to_token_stream()`)
-* [x] Implement `#[derive(ToTokens)]`, get `impl Spanned` for free
-* [x] Handle recursive types (which result in unsatisfiable constraints)
-* [x] `parsel::ast::Word` type, which is a thin wrapper around `Ident`, except that
-      its default parse uses `Ident::parse_any()`, so it can also parse identifiers
-      that would otherwise fail because they are keywords in Rust.
-* [x] `try_parse_quote!{ ... }` and `try_parse_quote_spanned!{ ... }`: non-panicking,
-      `Result`-returning equivalents of `parse_quote!` and `parse_quote_spanned!`.
-* [x] `define_keywords!{ ... }` macro, a corresponding `Keywords` trait, and Parsel's
-      own `CustomIdent<Keywords>` type. These work together in order to:
-  * Define a module full of custom keywords via `syn::custom_keyword!`
-  * Define a unit/empty marker type that implements `Keywords` with its associated
-    `const KEYWORDS: &[&str]` containing a list of all custom keywords so defined;
-  * Parse identifiers, automatically rejecting custom keywords, by looking at the
-    associated `KEYWORDS` list.
-* [x] `ast::Eof` and `ast::NotEof` types for asserting end-of-input conditions
 * [ ] Document all of the public API
 * [ ] Document all of the non-public API as well
 * [ ] Make the error reporting heuristic for alternation (based on the furthest
@@ -367,4 +315,3 @@ not when used on e.g. a `TokenStream` obtained via `quote!()` or `parse_quote!()
       **accidentally quadratic parsing performance!**
 * [ ] `#[derive(Grammar)]` proc-macro for generating an EBNF-style grammar from
       the AST, for those CS people / auditors / etc. who love reading grammars.
-* [x] Code Examples, tutorial
