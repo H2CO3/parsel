@@ -1,0 +1,9 @@
+# Rust/Cargo generated files
+/target
+Cargo.lock
+
+# Vim swapfiles
+**/*.swm
+**/*.swn
+**/*.swo
+**/*.swp

@@ -1,0 +1,22 @@
+[package]
+name          = "parsel_derive"
+version       = "0.3.0"
+edition       = "2018"
+authors       = ["Árpád Goretity <h2co3@h2co3.org>"]
+repository    = "https://github.com/H2CO3/parsel/"
+homepage      = "https://h2co3.github.io/parsel/"
+license       = "MIT"
+readme        = "../README.md"
+documentation = "https://docs.rs/parsel"
+description   = "Zero-code parser generation by using AST node types as the grammar"
+categories    = ["compilers", "parsing", "parser-implementations", "development-tools", "rust-patterns"]
+keywords      = ["compiler", "parser", "generator", "syntax", "ast"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = { version = "1.0.39", features = ["span-locations"] }
+syn = { version = "1.0.98", features = ["extra-traits"] }
+quote = "1.0.19"
+darling = "0.14.1"

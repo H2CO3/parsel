@@ -1,0 +1,2 @@
+[workspace]
+members = ["parsel", "parsel_derive"]
