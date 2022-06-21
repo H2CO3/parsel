@@ -148,17 +148,28 @@ impl Display for SpanDisplay {
 /// Preserves span and message of original error (because they
 /// are more specific), but also adds our own, wider context.
 #[doc(hidden)]
-pub fn chain_error(
-    cause: &Error,
-    ty: &str,
-    member: &str,
+pub fn chain_error<T: Display>(
+    cause: Error,
+    enum_: &str,
+    ctor: &str,
+    field: T,
 ) -> Error {
-    let message = format!(
-        "error parsing {ty}::{member}, caused by:\n{cause}",
-        ty = ty,
-        member = member,
-        cause = cause,
-    );
+    let message = if enum_.is_empty() {
+        format!(
+            "error parsing {ctor}::{field}, caused by:\n{cause}",
+            ctor = ctor,
+            field = field,
+            cause = cause,
+        )
+    } else {
+        format!(
+            "error parsing {enum_}::{ctor}::{field}, caused by:\n{cause}",
+            enum_ = enum_,
+            ctor = ctor,
+            field = field,
+            cause = cause,
+        )
+    };
     Error::new(cause.span(), message)
 }
 

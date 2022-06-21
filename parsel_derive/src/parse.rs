@@ -41,7 +41,11 @@ fn expand_struct(ty_name: &Ident, data: &DataStruct) -> Result<TokenStream> {
 
 /// Parses every field in sequence, in the order they are specified in the source.
 fn expand_fields(enum_name: Option<&Ident>, ctor_name: &Ident, fields: &Fields) -> Result<TokenStream> {
+    // these are passed to `chain_error()` for describing the production currently being parsed
+    let enum_str = enum_name.map(Ident::to_string).unwrap_or_default();
+    let ctor_str = ctor_name.to_string();
     let enum_name = enum_name.into_iter();
+
     match fields {
         Fields::Named(fields) => {
             let inits: Vec<_> = fields.named
@@ -50,9 +54,12 @@ fn expand_fields(enum_name: Option<&Ident>, ctor_name: &Ident, fields: &Fields) 
                     let field_name = field.ident.as_ref().ok_or_else(|| {
                         Error::new(ctor_name.span(), "unnamed field in named struct")
                     })?;
+                    let field_str = field_name.to_string();
 
                     Ok(quote!{
-                        #field_name: ::parsel::syn::parse::ParseBuffer::parse(input)?
+                        #field_name: input.parse().map_err(|cause| {
+                            ::parsel::util::chain_error(cause, #enum_str, #ctor_str, #field_str)
+                        })?
                     })
                 })
                 .collect::<Result<_>>()?;
@@ -65,8 +72,12 @@ fn expand_fields(enum_name: Option<&Ident>, ctor_name: &Ident, fields: &Fields) 
             })
         }
         Fields::Unnamed(fields) => {
-            let inits = fields.unnamed.iter().map(|_| {
-                quote!{ ::parsel::syn::parse::ParseBuffer::parse(input)? }
+            let inits = fields.unnamed.iter().enumerate().map(|(index, _)| {
+                quote!{
+                    input.parse().map_err(|cause| {
+                        ::parsel::util::chain_error(cause, #enum_str, #ctor_str, #index)
+                    })?
+                }
             });
 
             Ok(quote!{
@@ -76,8 +87,7 @@ fn expand_fields(enum_name: Option<&Ident>, ctor_name: &Ident, fields: &Fields) 
         }
         Fields::Unit => {
             Ok(quote!{
-                let ast_node = #(#enum_name::)* #ctor_name;
-                ::parsel::Result::Ok(ast_node)
+                ::parsel::Result::Ok(#(#enum_name::)* #ctor_name)
             })
         }
     }
@@ -119,8 +129,6 @@ fn expand_variants(ty_name: &Ident, variants: &Punctuated<Variant, Token![,]>) -
 
             let fork_name = format_ident!("parsel_fork_{}", variant_name);
             let parser_fn_name = format_ident!("parsel_parse_{}", variant_name);
-            let ty_str = ty_name.to_string();
-            let variant_str = variant_name.to_string();
 
             Ok(quote!{
                 let #parser_fn_name = |input: ::parsel::syn::parse::ParseStream<'_>| -> ::parsel::Result<_> {
@@ -137,8 +145,7 @@ fn expand_variants(ty_name: &Ident, variants: &Punctuated<Variant, Token![,]>) -
                         return ::parsel::Result::Ok(ast);
                     }
                     ::parsel::Result::Err(cause) => {
-                        let err = ::parsel::util::chain_error(&cause, #ty_str, #variant_str);
-                        errors.push(err);
+                        errors.push(cause);
                     }
                 }
             })

@@ -415,26 +415,30 @@ impl ToTokens for Empty {
 /// }
 ///
 /// #[derive(PartialEq, Eq, Debug, Parse)]
-/// enum IntOrBoolAtEnd {
+/// enum BoolAtEndOrInt {
 ///     Bool(BoolAtEnd),
 ///     Int(LitInt),
 /// }
 ///
-/// let actual: Punctuated<IntOrBoolAtEnd, Comma> = "2, 46, 802, false".parse()?;
+/// let actual: Punctuated<BoolAtEndOrInt, Comma> = "2, 46, 802, false".parse()?;
 /// let actual: Vec<_> = actual.into_iter().collect();
 /// let expected = [
-///     IntOrBoolAtEnd::Int(LitInt::from(2)),
-///     IntOrBoolAtEnd::Int(LitInt::from(46)),
-///     IntOrBoolAtEnd::Int(LitInt::from(802)),
-///     IntOrBoolAtEnd::Bool(BoolAtEnd {
+///     BoolAtEndOrInt::Int(LitInt::from(2)),
+///     BoolAtEndOrInt::Int(LitInt::from(46)),
+///     BoolAtEndOrInt::Int(LitInt::from(802)),
+///     BoolAtEndOrInt::Bool(BoolAtEnd {
 ///         value: LitBool::from(false),
 ///         eof: Eof,
 ///     }),
 /// ];
 /// assert_eq!(actual, expected);
 ///
-/// let bad: Result<Punctuated<IntOrBoolAtEnd, Comma>> = "2, 46, false, 802".parse();
-/// assert!(bad.is_err());
+/// let bad: Result<Punctuated<BoolAtEndOrInt, Comma>> = "2, 46, false, 802".parse();
+/// let message = bad.as_ref().unwrap_err().to_string();
+/// assert!(
+///     message.contains("expected end of input"),
+///     "actual error: {}", message
+/// );
 /// #
 /// # Result::<()>::Ok(())
 /// ```
