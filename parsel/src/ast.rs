@@ -552,7 +552,7 @@ impl Display for NotEof {
 impl Parse for NotEof {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         if input.is_empty() {
-            Err(input.error("expected more input, found end of input"))
+            Err(input.error("unexpected end of input"))
         } else {
             Ok(NotEof)
         }
@@ -1526,7 +1526,7 @@ where
 /// ];
 /// assert_eq!(actual, expected);
 /// ```
-pub type Many<T> = Punctuated<T, Empty>;
+pub type Many<T> = Punctuated<T, NotEof>;
 
 /// Parses a given production repeatedly, separated by punctuation.
 /// Trailing punctuation is **not** allowed, and the production must

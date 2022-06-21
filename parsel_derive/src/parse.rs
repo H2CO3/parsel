@@ -119,7 +119,8 @@ fn expand_variants(ty_name: &Ident, variants: &Punctuated<Variant, Token![,]>) -
 
             let fork_name = format_ident!("parsel_fork_{}", variant_name);
             let parser_fn_name = format_ident!("parsel_parse_{}", variant_name);
-            let err_msg_format = format!("error parsing {}::{}: {{}}", ty_name, variant_name);
+            let ty_str = ty_name.to_string();
+            let variant_str = variant_name.to_string();
 
             Ok(quote!{
                 let #parser_fn_name = |input: ::parsel::syn::parse::ParseStream<'_>| -> ::parsel::Result<_> {
@@ -135,9 +136,9 @@ fn expand_variants(ty_name: &Ident, variants: &Punctuated<Variant, Token![,]>) -
                         );
                         return ::parsel::Result::Ok(ast);
                     }
-                    ::parsel::Result::Err(err) => {
-                        let message = ::std::format!(#err_msg_format, err);
-                        errors.push(#fork_name.error(message));
+                    ::parsel::Result::Err(cause) => {
+                        let err = ::parsel::util::chain_error(&cause, #ty_str, #variant_str);
+                        errors.push(err);
                     }
                 }
             })
