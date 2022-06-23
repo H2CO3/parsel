@@ -26,8 +26,9 @@ pub fn expand(stream: TokenStream) -> Result<TokenStream> {
         #[automatically_derived]
         impl #impl_gen ::core::fmt::Display for #ty_name #ty_gen #where_clause {
             fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-                let ts = ::parsel::ToTokens::to_token_stream(self);
-                ::core::fmt::Display::fmt(&ts, formatter)
+                let stream = ::parsel::ToTokens::to_token_stream(self);
+                let mut ts_fmt = ::parsel::util::TokenStreamFormatter::new(formatter);
+                ts_fmt.write(stream)
             }
         }
     })

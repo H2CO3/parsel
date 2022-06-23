@@ -19,6 +19,7 @@ use syn::ext::IdentExt;
 use syn::parse::{Error, Result, Parse, ParseStream};
 use syn::punctuated::{Pair, IntoIter, Iter, IterMut, IntoPairs, Pairs, PairsMut};
 use quote::ToTokens;
+use crate::util::TokenStreamFormatter;
 
 pub use proc_macro2::Ident;
 pub use syn::Token;
@@ -839,7 +840,9 @@ where
     T: ToTokens,
 {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(&self.to_token_stream(), formatter)
+        let stream = self.to_token_stream();
+        let mut ts_fmt = TokenStreamFormatter::new(formatter);
+        ts_fmt.write(stream)
     }
 }
 
@@ -985,7 +988,9 @@ impl<T> AsRef<T> for Paren<T> {
 
 impl<T: ToTokens> Display for Paren<T> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(&self.to_token_stream(), formatter)
+        let stream = self.to_token_stream();
+        let mut ts_fmt = TokenStreamFormatter::new(formatter);
+        ts_fmt.write(stream)
     }
 }
 
@@ -1102,7 +1107,9 @@ impl<T> AsRef<T> for Bracket<T> {
 
 impl<T: ToTokens> Display for Bracket<T> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(&self.to_token_stream(), formatter)
+        let stream = self.to_token_stream();
+        let mut ts_fmt = TokenStreamFormatter::new(formatter);
+        ts_fmt.write(stream)
     }
 }
 
@@ -1226,7 +1233,9 @@ impl<T> AsRef<T> for Brace<T> {
 
 impl<T: ToTokens> Display for Brace<T> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(&self.to_token_stream(), formatter)
+        let stream = self.to_token_stream();
+        let mut ts_fmt = TokenStreamFormatter::new(formatter);
+        ts_fmt.write(stream)
     }
 }
 
@@ -1453,7 +1462,9 @@ where
     P: ToTokens,
 {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(&self.to_token_stream(), formatter)
+        let stream = self.to_token_stream();
+        let mut ts_fmt = TokenStreamFormatter::new(formatter);
+        ts_fmt.write(stream)
     }
 }
 
@@ -1549,7 +1560,7 @@ pub type Many<T> = Punctuated<T, NotEof>;
 /// };
 /// sum.push_value(LitInt::from(64));
 ///
-/// assert_eq!(sum.to_string().trim(), "1 + 2 + 4 + 8 + 16 + 32 + 64");
+/// assert_eq!(sum.to_string(), "1 + 2 + 4 + 8 + 16 + 32 + 64");
 ///
 /// let good_short: Separated<Ident, Colon2> = parsel::parse_quote!(one);
 /// let good_short: Vec<_> = good_short.into_iter().collect();
@@ -1851,7 +1862,9 @@ where
     P: ToTokens,
 {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(&self.to_token_stream(), formatter)
+        let stream = self.to_token_stream();
+        let mut ts_fmt = TokenStreamFormatter::new(formatter);
+        ts_fmt.write(stream)
     }
 }
 
@@ -2844,9 +2857,15 @@ impl ToTokens for Lit {
 /// };
 ///
 /// assert_eq!(actual, expected);
+/// assert_eq!(actual.to_string(), expected.to_string());
 /// assert_eq!(
-///     expected.to_string().trim(),
-///     "10 - 2.99 + p / 42.0 - (q - - 24.314) * - 13",
+///     expected.to_string(),
+///     str::trim(r#"
+/// 10 - 2.99 + p / 42.0 - (
+///     q - - 24.314
+/// )
+/// * - 13
+///     "#),
 /// );
 /// ```
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -2897,7 +2916,9 @@ where
     R: ToTokens,
 {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(&self.to_token_stream(), formatter)
+        let stream = self.to_token_stream();
+        let mut ts_fmt = TokenStreamFormatter::new(formatter);
+        ts_fmt.write(stream)
     }
 }
 
@@ -3017,7 +3038,7 @@ where
 ///                )
 ///            )),
 ///        }
-///    ))),
+///     ))),
 ///     op: And::default(),
 ///     rhs: Box::new(RightAssoc::<And, _>::Lhs(
 ///         Term::Not(
@@ -3090,7 +3111,9 @@ where
     L: ToTokens,
 {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(&self.to_token_stream(), formatter)
+        let stream = self.to_token_stream();
+        let mut ts_fmt = TokenStreamFormatter::new(formatter);
+        ts_fmt.write(stream)
     }
 }
 

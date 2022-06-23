@@ -1,6 +1,7 @@
 //! Helper functions, types and macros that didn't fit anywhere else.
 
-use std::fmt::{self, Debug, Display, Formatter};
+use core::fmt::{self, Debug, Display, Formatter, Write};
+use proc_macro2::{TokenStream, TokenTree, Spacing, Delimiter};
 use crate::{Error, Span, Spanned};
 
 /// Similar to `syn::parse_quote!`, but instead of panicking, it returns an
@@ -173,3 +174,184 @@ pub fn chain_error<T: Display>(
     Error::new(cause.span(), message)
 }
 
+/// Helper type for correctly and reasonably "pretty"-printing any `TokenStream` in
+/// a grammar- and language-agnostic way. This mostly means dealing with parentheses,
+/// so that nested structures don't end up on one single long line.
+///
+/// Of course, it is not possible to perform pretty-printing in a completely generic
+/// manner, but the primary purpose of this mechanism is not that -- it's merely trying
+/// to be a useful debugging tool, of which the results are less unnecessarily verbose,
+/// and therefore easier to read, than the output of `#[derive(Debug)]`.
+///
+/// ```rust
+/// use parsel::util::TokenStreamFormatter;
+/// use parsel::quote::quote;
+///
+/// let ts = quote!{
+///     [
+///         [
+///             7.43 * {
+///                 zzz (
+///                     3333 + "52" - 'a / [
+///                         foo bar || &baz;
+///                     ]
+///                 ) != 5;
+///                 ww;
+///                 $ foo $bar #![attribute]
+///             },
+///             x, y
+///         ]
+///     ]
+/// };
+///
+/// let mut string = String::new();
+/// let mut fmt = TokenStreamFormatter::new(&mut string);
+/// fmt.write(ts)?;
+///
+/// assert_eq!(string, str::trim(r#"
+/// [
+///     [
+///         7.43 * {
+///             zzz (
+///                 3333 + "52" - 'a / [
+///                     foo bar || & baz ;
+///                 ]
+///             )
+///             != 5 ;
+///             ww ;
+///             $ foo $ bar # ! [
+///                 attribute
+///             ]
+///         }
+///         ,
+///         x ,
+///         y
+///     ]
+/// ]
+/// "#));
+/// #
+/// # Ok::<(), core::fmt::Error>(())
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct TokenStreamFormatter<S, W> {
+    indent_level: usize,
+    indent_string: S,
+    writer: W,
+}
+
+impl<S, W> TokenStreamFormatter<S, W>
+where
+    S: AsRef<str>,
+{
+    /// Constructor for indenting with arbitrary whitespace.
+    ///
+    /// This returns an error when non-whitespace characters are present in the indentation.
+    ///
+    /// ```rust
+    /// # use std::io::Cursor;
+    /// # use parsel::util::TokenStreamFormatter;
+    /// #
+    /// let ok = TokenStreamFormatter::with_indent("  \t", Cursor::new(&[] as &[u8]));
+    /// assert!(ok.is_ok());
+    ///
+    /// let err = TokenStreamFormatter::with_indent("  not ws ", Cursor::new(&[] as &[u8]));
+    /// assert!(err.is_err());
+    /// ```
+    pub fn with_indent(indent_string: S, writer: W) -> Result<Self, Error> {
+        if indent_string.as_ref().trim().is_empty() {
+            Ok(TokenStreamFormatter {
+                indent_level: 0,
+                indent_string,
+                writer,
+            })
+        } else {
+            Err(Error::new(Span::call_site(), "indentation contains non-whitespace characters"))
+        }
+    }
+}
+
+impl<S, W> TokenStreamFormatter<S, W>
+where
+    S: AsRef<str>,
+    W: Write,
+{
+    pub fn write(&mut self, stream: TokenStream) -> core::fmt::Result {
+        self.write_indent()?;
+        let mut spacing = Spacing::Joint;
+        let mut iter = stream.into_iter().peekable();
+
+        while let Some(tt) = iter.next() {
+            if spacing == Spacing::Joint {
+                spacing = Spacing::Alone;
+            } else {
+                self.writer.write_char(' ')?;
+            }
+
+            match tt {
+                TokenTree::Literal(lit) => write!(self.writer, "{}", lit)?,
+                TokenTree::Ident(ident) => write!(self.writer, "{}", ident)?,
+                TokenTree::Punct(punct) => {
+                    write!(self.writer, "{}", punct)?;
+                    spacing = punct.spacing();
+
+                    if matches!(
+                        (punct.as_char(), spacing, iter.peek()),
+                        (',' | ';', Spacing::Alone, Some(_))
+                    ) {
+                        writeln!(self.writer)?;
+                        self.write_indent()?;
+                        spacing = Spacing::Joint;
+                    }
+                }
+                TokenTree::Group(group) => {
+                    let (open, close) = match group.delimiter() {
+                        Delimiter::None => {
+                            self.write(group.stream())?;
+                            continue;
+                        }
+                        Delimiter::Parenthesis => ('(', ')'),
+                        Delimiter::Bracket => ('[', ']'),
+                        Delimiter::Brace => ('{', '}'),
+                    };
+
+                    self.writer.write_char(open)?;
+                    self.indent_level += 1;
+                    writeln!(self.writer)?;
+
+                    self.write(group.stream())?;
+
+                    self.indent_level -= 1;
+                    writeln!(self.writer)?;
+                    self.write_indent()?;
+                    self.writer.write_char(close)?;
+
+                    if iter.peek().is_some() {
+                        writeln!(self.writer)?;
+                        self.write_indent()?;
+                        spacing = Spacing::Joint;
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn write_indent(&mut self) -> core::fmt::Result {
+        for _ in 0..self.indent_level {
+            self.writer.write_str(self.indent_string.as_ref())?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<W> TokenStreamFormatter<&'static str, W> {
+    pub const fn new(writer: W) -> Self {
+        TokenStreamFormatter {
+            indent_level: 0,
+            indent_string: "    ",
+            writer,
+        }
+    }
+}
