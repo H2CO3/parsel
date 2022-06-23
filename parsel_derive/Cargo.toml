@@ -1,6 +1,6 @@
 [package]
 name          = "parsel_derive"
-version       = "0.6.1"
+version       = "0.6.2"
 edition       = "2018"
 authors       = ["Árpád Goretity <h2co3@h2co3.org>"]
 repository    = "https://github.com/H2CO3/parsel/"
