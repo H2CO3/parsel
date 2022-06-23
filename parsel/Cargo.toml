@@ -21,3 +21,4 @@ quote = "1.0.20"
 
 [dev-dependencies]
 anyhow = "1.0.58"
+quickcheck = "1.0.3"
