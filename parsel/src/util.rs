@@ -31,14 +31,7 @@ use crate::{Error, Span, Spanned};
 #[macro_export]
 macro_rules! try_parse_quote {
     ($($tt:tt)*) => {
-        match ::parsel::parse2(::parsel::quote::quote!($($tt)*)) {
-            ::parsel::Result::Ok(ast) => ast,
-            ::parsel::Result::Err(error) => {
-                return ::core::result::Result::Err(
-                    ::core::convert::From::from(error)
-                )
-            }
-        }
+        ::parsel::parse2(::parsel::quote::quote!($($tt)*))?
     }
 }
 
@@ -88,14 +81,7 @@ macro_rules! try_parse_quote {
 #[macro_export]
 macro_rules! try_parse_quote_spanned {
     ($span:expr => $($tt:tt)*) => {
-        match ::parsel::parse2(::parsel::quote::quote_spanned!($span => $($tt)*)) {
-            ::parsel::Result::Ok(ast) => ast,
-            ::parsel::Result::Err(error) => {
-                return ::core::result::Result::Err(
-                    ::core::convert::From::from(error)
-                )
-            }
-        }
+        ::parsel::parse2(::parsel::quote::quote_spanned!($span => $($tt)*))?
     }
 }
 
@@ -114,6 +100,36 @@ where
 }
 
 /// Helper type that formats a `Span` in a human-readable way.
+///
+/// ```rust
+/// # use parsel::{Error, Parse, TokenStream};
+/// # use parsel::ast::{Token, Word, Separated};
+/// # use parsel::util::FormatSpan;
+/// #
+/// #[derive(Clone, Debug, Parse)]
+/// struct HttpHeader {
+///     key: Separated<Word, Token![-]>,
+///     colon: Token![:],
+///     value: TokenStream,
+/// }
+///
+/// let header: HttpHeader = parsel::parse_str(r#"
+///     // this comment exists only so that there is a line before the actual tokens
+///     Content-Type: application/json
+///     /* another comment, just to confuse the lexer */
+/// "#)?;
+///
+/// let key_span = header.key.format_span().to_string();
+/// assert_eq!(key_span, "3:5..3:16");
+///
+/// let colon_span = header.colon.format_span().to_string();
+/// assert_eq!(colon_span, "3:17..3:17");
+///
+/// let value_span = header.value.format_span().to_string();
+/// assert_eq!(value_span, "3:19..3:34");
+/// #
+/// # Ok::<(), Error>(())
+/// ```
 #[derive(Clone, Copy, Debug)]
 pub struct SpanDisplay {
     span: Span,
@@ -197,6 +213,7 @@ pub fn chain_error<T: Display>(
 ///                     ]
 ///                 ) != 5;
 ///                 ww;
+///                 6 <<= 78 >>= 951,
 ///                 $ foo $bar #![attribute]
 ///             },
 ///             x, y
@@ -219,6 +236,7 @@ pub fn chain_error<T: Display>(
 ///             )
 ///             != 5 ;
 ///             ww ;
+///             6 <<= 78 >>= 951 ,
 ///             $ foo $ bar # ! [
 ///                 attribute
 ///             ]

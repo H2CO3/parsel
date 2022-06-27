@@ -670,7 +670,7 @@ impl ToTokens for NotEof {
 /// );
 /// ```
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Maybe<P, T> {
+pub struct Maybe<P, T = Empty> {
     inner: Option<(P, T)>,
 }
 
