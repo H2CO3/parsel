@@ -308,10 +308,12 @@ not when used on e.g. a `TokenStream` obtained via `quote!()` or `parse_quote!()
 
 * [ ] Document all of the public API
 * [ ] Document all of the non-public API as well
+* [ ] `enum Either` AST helper type for basic binary alternation
+* [ ] `Any` AST helper type for parsing until a given production succeeds. Unlike
+      `Many`, it doesn't require the productions to extend until end-of-input.
+* [ ] Span reporting for parsing `Group`s should be correct; investigate
 * [ ] Make the error reporting heuristic for alternation (based on the furthest
       parsing production) work even when span information is not useful. **Nota
       bene:** this absolutely **shouldn't** be done by just counting the number
       of tokens/bytes in the remaining input, because that will result in an
       **accidentally quadratic parsing performance!**
-* [ ] `#[derive(Grammar)]` proc-macro for generating an EBNF-style grammar from
-      the AST, for those CS people / auditors / etc. who love reading grammars.

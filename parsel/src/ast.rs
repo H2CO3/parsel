@@ -2036,6 +2036,7 @@ impl LitBool {
 
 impl LitByte {
     /// This method is non-trivial, so here is a doc-test for it.
+    ///
     /// ```rust
     /// # use parsel::ast::LitByte;
     /// # use parsel::parse_quote;
