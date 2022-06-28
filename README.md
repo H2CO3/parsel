@@ -309,7 +309,7 @@ not when used on e.g. a `TokenStream` obtained via `quote!()` or `parse_quote!()
 * [ ] Document all of the public API
 * [ ] Document all of the non-public API as well
 * [x] `enum Either` AST helper type for basic binary alternation
-* [ ] `Any` AST helper type for parsing until a given production succeeds. Unlike
+* [x] `Any` AST helper type for parsing until a given production succeeds. Unlike
       `Many`, it doesn't require the productions to extend until end-of-input.
 * [x] Implement `AsRef`, `Deref`, and `Borrow` consistently for wrapper types
       (e.g., `Paren`, `Bracket`, `Brace`)
