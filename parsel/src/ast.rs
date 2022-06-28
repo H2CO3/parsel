@@ -13,14 +13,14 @@ use core::hash::{Hash, Hasher};
 use core::ops::{Deref, DerefMut, Index, IndexMut};
 use core::fmt::{self, Debug, Display, Formatter};
 use std::borrow::{Cow, Borrow, BorrowMut};
-use proc_macro2::{TokenStream, Span, Literal};
+use proc_macro2::{TokenStream, TokenTree, Span, Literal};
 use ordered_float::NotNan;
 use syn::spanned::Spanned;
 use syn::ext::IdentExt;
 use syn::parse::{Error, Result, Parse, ParseStream};
 use syn::punctuated::{Pair, IntoIter, Iter, IterMut, IntoPairs, Pairs, PairsMut};
 use crate::syn::parse::discouraged::Speculative;
-use quote::ToTokens;
+use quote::{ToTokens, TokenStreamExt};
 use crate::util::TokenStreamFormatter;
 
 pub use proc_macro2::Ident;
@@ -179,8 +179,10 @@ impl Word {
 /// [`KeywordList`](ast/trait.KeywordList.html).
 ///
 /// ```rust
-/// # use parsel::{define_keywords, Error, Result};
-/// # use parsel::ast::{CustomIdent, KeywordList};
+/// # use parsel::{define_keywords, Error, Result, TokenTree};
+/// # use parsel::quote::quote;
+/// # use parsel::ast::{ident, CustomIdent, KeywordList};
+/// #
 /// define_keywords!{
 ///     mod kw {
 ///         Foo => foo;
@@ -219,13 +221,24 @@ impl Word {
 ///     invalid_quux.unwrap_err().to_string(),
 ///     "expected keyword `quux`",
 /// );
-/// #
-/// # fn assert_keyword_list<K>(_: K)
-/// # where
-/// #     K: Copy + Default + KeywordList
-/// # {}
-/// #
-/// # assert_keyword_list(kw::Keywords);
+///
+/// let kw_bar = kw::Bar::default();
+/// let kw_quux = kw::Quux::default();
+/// let some_stream = quote![#kw_quux #kw_bar #kw_quux];
+/// let actual_tokens: Vec<_> = some_stream.clone().into_iter().collect();
+/// let expected_tokens = ["quux", "bar", "quux"].map(|x| TokenTree::from(ident(x)));
+///
+/// assert_eq!(some_stream.to_string(), "quux bar quux");
+/// assert!(matches!(actual_tokens, expected_tokens));
+///
+/// // Ensure that the generated `Keywords` struct implements `KeywordList`
+/// // and is default-constructible, trivially-copiable
+/// fn assert_keyword_list<K>(_: K)
+/// where
+///     K: Copy + Default + KeywordList
+/// {}
+///
+/// assert_keyword_list(kw::Keywords);
 /// #
 /// # Ok::<(), Error>(())
 /// ```
@@ -264,6 +277,12 @@ macro_rules! define_keywords {
                 impl ::core::default::Default for $name {
                     fn default() -> Self {
                         Self::new(::parsel::Span::call_site())
+                    }
+                }
+
+                impl ::core::convert::From<$name> for ::parsel::proc_macro2::TokenTree {
+                    fn from(kw: $name) -> Self {
+                        ::parsel::proc_macro2::TokenTree::Ident(kw.token())
                     }
                 }
 
@@ -340,7 +359,7 @@ macro_rules! define_keywords {
 
                 impl ::parsel::ToTokens for $name {
                     fn to_tokens(&self, tokens: &mut ::parsel::TokenStream) {
-                        ::parsel::ToTokens::to_tokens(&self.token(), tokens);
+                        ::parsel::quote::TokenStreamExt::append(tokens, self.token());
                     }
                 }
             )*
@@ -1960,6 +1979,271 @@ where
     }
 }
 
+/// Parses 0 or more consecutive occurrences of the subproduction.
+/// Unlike [`Many`](type.Many.html), this does **not** require the
+/// input to consist entirely of repeats of the subproduction.
+///
+/// ```rust
+/// # use parsel::{Error, Result, FromStr, Display, Parse, ToTokens};
+/// # use parsel::ast::{word, Word, LitInt, Any};
+/// #
+/// #[derive(PartialEq, Eq, Debug, FromStr, Display, Parse, ToTokens)]
+/// struct WordsAndNumbers {
+///     words: Any<Word>,
+///     numbers: Any<LitInt>,
+/// }
+///
+/// let empty: WordsAndNumbers = "".parse()?;
+/// assert_eq!(*empty.words, &[] as &[Word]);
+/// assert_eq!(*empty.numbers, &[] as &[LitInt]);
+///
+/// let one_word: WordsAndNumbers = "one_word".parse()?;
+/// assert_eq!(*one_word.words, [word("one_word")]);
+/// assert_eq!(*one_word.numbers, &[] as &[LitInt]);
+///
+/// let many_words: WordsAndNumbers = "one two three".parse()?;
+/// assert_eq!(*many_words.words, ["one", "two", "three"].map(word));
+/// assert_eq!(*many_words.numbers, &[] as &[LitInt]);
+///
+/// let one_number: WordsAndNumbers = "777 ".parse()?;
+/// assert_eq!(*one_number.words, &[] as &[Word]);
+/// assert_eq!(*one_number.numbers, [LitInt::from(777)]);
+///
+/// let many_numbers: WordsAndNumbers = "88 777  99999".parse()?;
+/// assert_eq!(*many_numbers.words, &[] as &[Word]);
+/// assert_eq!(*many_numbers.numbers, [88, 777, 99999].map(LitInt::from));
+///
+/// let mixed: WordsAndNumbers = "hello_world someident 222 333".parse()?;
+/// assert_eq!(*mixed.words, ["hello_world", "someident"].map(word));
+/// assert_eq!(*mixed.numbers, [222, 333].map(LitInt::from));
+///
+/// let bad: Result<WordsAndNumbers> = "word 3456 more_words".parse();
+/// assert!(bad.is_err());
+/// #
+/// # Ok::<(), Error>(())
+/// ```
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct Any<T> {
+    inner: Vec<T>,
+}
+
+impl<T> Any<T> {
+    pub const fn new() -> Self {
+        Any {
+            inner: Vec::new(),
+        }
+    }
+
+    pub fn into_inner(self) -> Vec<T> {
+        self.inner
+    }
+
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    pub fn iter(&self) -> core::slice::Iter<'_, T> {
+        self.inner.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> core::slice::IterMut<'_, T> {
+        self.inner.iter_mut()
+    }
+}
+
+impl<T> Default for Any<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T> From<Vec<T>> for Any<T> {
+    fn from(inner: Vec<T>) -> Self {
+        Any { inner }
+    }
+}
+
+impl<T> From<Any<T>> for Vec<T> {
+    fn from(value: Any<T>) -> Self {
+        value.inner
+    }
+}
+
+impl<T> Deref for Any<T> {
+    type Target = Vec<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<T> DerefMut for Any<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl<T> AsRef<[T]> for Any<T> {
+    fn as_ref(&self) -> &[T] {
+        &self.inner
+    }
+}
+
+impl<T> AsRef<Vec<T>> for Any<T> {
+    fn as_ref(&self) -> &Vec<T> {
+        &self.inner
+    }
+}
+
+impl<T> AsMut<[T]> for Any<T> {
+    fn as_mut(&mut self) -> &mut [T] {
+        &mut self.inner
+    }
+}
+
+impl<T> AsMut<Vec<T>> for Any<T> {
+    fn as_mut(&mut self) -> &mut Vec<T> {
+        &mut self.inner
+    }
+}
+
+impl<T> Borrow<[T]> for Any<T> {
+    fn borrow(&self) -> &[T] {
+        &self.inner
+    }
+}
+
+impl<T> Borrow<Vec<T>> for Any<T> {
+    fn borrow(&self) -> &Vec<T> {
+        &self.inner
+    }
+}
+
+impl<T> BorrowMut<[T]> for Any<T> {
+    fn borrow_mut(&mut self) -> &mut [T] {
+        &mut self.inner
+    }
+}
+
+impl<T> BorrowMut<Vec<T>> for Any<T> {
+    fn borrow_mut(&mut self) -> &mut Vec<T> {
+        &mut self.inner
+    }
+}
+
+impl<T> FromIterator<T> for Any<T> {
+    fn from_iter<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = T>
+    {
+        Any {
+            inner: iter.into_iter().collect(),
+        }
+    }
+}
+
+impl<T> Extend<T> for Any<T> {
+    fn extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = T>
+    {
+        self.inner.extend(iter);
+    }
+}
+
+impl<T> IntoIterator for Any<T> {
+    type Item = T;
+    type IntoIter = std::vec::IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner.into_iter()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a Any<T> {
+    type Item = &'a T;
+    type IntoIter = core::slice::Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner.iter()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a mut Any<T> {
+    type Item = &'a mut T;
+    type IntoIter = core::slice::IterMut<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner.iter_mut()
+    }
+}
+
+impl<T> Debug for Any<T>
+where
+    T: Debug
+{
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        Debug::fmt(&self.inner, formatter)
+    }
+}
+
+impl<T> Display for Any<T>
+where
+    T: ToTokens
+{
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        let stream = self.to_token_stream();
+        let mut ts_fmt = TokenStreamFormatter::new(formatter);
+        ts_fmt.write(stream)
+    }
+}
+
+impl<T> FromStr for Any<T>
+where
+    T: Parse
+{
+    type Err = Error;
+
+    fn from_str(string: &str) -> Result<Self> {
+        syn::parse_str(string)
+    }
+}
+
+impl<T> Parse for Any<T>
+where
+    T: Parse
+{
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
+        let mut inner = Vec::new();
+
+        loop {
+            let fork = input.fork();
+
+            if let Ok(item) = fork.parse() {
+                inner.push(item);
+                input.advance_to(&fork);
+            } else {
+                break;
+            }
+        }
+
+        Ok(Any { inner })
+    }
+}
+
+impl<T> ToTokens for Any<T>
+where
+    T: ToTokens
+{
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        tokens.append_all(&self.inner);
+    }
+}
+
 macro_rules! impl_literal {
     ($($raw:ty => $name:ident;)*) => {$(
         #[derive(Clone, Debug)]
@@ -2012,6 +2296,12 @@ macro_rules! impl_literal {
             }
         }
 
+        impl From<$name> for TokenTree {
+            fn from(lit: $name) -> TokenTree {
+                lit.token().into()
+            }
+        }
+
         impl PartialEq<Self> for $name {
             fn eq(&self, other: &Self) -> bool {
                 self.value == other.value
@@ -2048,7 +2338,7 @@ macro_rules! impl_literal {
 
         impl ToTokens for $name {
             fn to_tokens(&self, tokens: &mut TokenStream) {
-                self.token().to_tokens(tokens);
+                tokens.append(self.token());
             }
         }
     )*}
@@ -2107,7 +2397,7 @@ impl LitByte {
     /// assert_eq!(token_nonascii_ff.to_string(), r"b'\xff'");
     /// ```
     pub fn token(&self) -> Literal {
-        use std::{str, ascii};
+        use core::{str, ascii};
         use std::io::{Write, Cursor};
 
         let mut buf: [u8; 8] = Default::default();
@@ -2460,7 +2750,7 @@ impl Parse for LitByteStr {
 /// is preserved when converted between `parsel::ast::Lit` and `syn::Lit`.
 ///
 /// ```rust
-/// # use std::convert::TryFrom;
+/// # use core::convert::TryFrom;
 /// # use parsel::ast::Lit;
 /// # use parsel::ast::Many;
 /// # use parsel::ToTokens;
@@ -2818,7 +3108,7 @@ impl ToTokens for Lit {
 /// ## Examples
 ///
 /// ```rust
-/// # use std::convert::TryFrom;
+/// # use core::convert::TryFrom;
 /// # use parsel::{Parse, ToTokens};
 /// # use parsel::ast::{Lit, LitInt, LitUint, LitFloat, Ident, Paren, LeftAssoc};
 /// # use parsel::ast::{token, ident};
