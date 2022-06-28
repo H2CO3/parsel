@@ -4,20 +4,22 @@
 //! * Parenthesization, delimiting
 //! * Separation of consecutive items
 
-use core::iter::FromIterator;
+use core::cmp::max_by_key;
+use core::iter::{FromIterator, FusedIterator};
 use core::convert::TryFrom;
 use core::str::FromStr;
 use core::num::NonZeroUsize;
 use core::hash::{Hash, Hasher};
 use core::ops::{Deref, DerefMut, Index, IndexMut};
 use core::fmt::{self, Debug, Display, Formatter};
-use std::borrow::Cow;
+use std::borrow::{Cow, Borrow, BorrowMut};
 use proc_macro2::{TokenStream, Span, Literal};
 use ordered_float::NotNan;
 use syn::spanned::Spanned;
 use syn::ext::IdentExt;
 use syn::parse::{Error, Result, Parse, ParseStream};
 use syn::punctuated::{Pair, IntoIter, Iter, IterMut, IntoPairs, Pairs, PairsMut};
+use crate::syn::parse::discouraged::Speculative;
 use quote::ToTokens;
 use crate::util::TokenStreamFormatter;
 
@@ -868,8 +870,6 @@ where
         // because `ParseBuffer::peek()` as well as `Lookahead1::peek()`
         // expect a function, of which the type cannot be named. So, we hack
         // this limitation around by attempting a full parse of the prefix.
-        use syn::parse::discouraged::Speculative;
-
         let fork = input.fork();
 
         if let Ok(prefix) = fork.parse::<P>() {
@@ -1359,6 +1359,30 @@ impl<T, P> DerefMut for Punctuated<T, P> {
     }
 }
 
+impl<T, P> AsRef<syn::punctuated::Punctuated<T, P>> for Punctuated<T, P> {
+    fn as_ref(&self) -> &syn::punctuated::Punctuated<T, P> {
+        &self.inner
+    }
+}
+
+impl<T, P> AsMut<syn::punctuated::Punctuated<T, P>> for Punctuated<T, P> {
+    fn as_mut(&mut self) -> &mut syn::punctuated::Punctuated<T, P> {
+        &mut self.inner
+    }
+}
+
+impl<T, P> Borrow<syn::punctuated::Punctuated<T, P>> for Punctuated<T, P> {
+    fn borrow(&self) -> &syn::punctuated::Punctuated<T, P> {
+        &self.inner
+    }
+}
+
+impl<T, P> BorrowMut<syn::punctuated::Punctuated<T, P>> for Punctuated<T, P> {
+    fn borrow_mut(&mut self) -> &mut syn::punctuated::Punctuated<T, P> {
+        &mut self.inner
+    }
+}
+
 impl<T, P> FromIterator<T> for Punctuated<T, P>
 where
     P: Default,
@@ -1776,6 +1800,22 @@ impl<T, P> Deref for Separated<T, P> {
     }
 }
 
+/// See the documentation of `impl Deref for Separated` for why this
+/// can't be `AsMut`.
+impl<T, P> AsRef<syn::punctuated::Punctuated<T, P>> for Separated<T, P> {
+    fn as_ref(&self) -> &syn::punctuated::Punctuated<T, P> {
+        &self.inner
+    }
+}
+
+/// See the documentation of `impl Deref for Separated` for why this
+/// can't be `BorrowMut`.
+impl<T, P> Borrow<syn::punctuated::Punctuated<T, P>> for Separated<T, P> {
+    fn borrow(&self) -> &syn::punctuated::Punctuated<T, P> {
+        &self.inner
+    }
+}
+
 /// `Extend<Pair<T, P>>` is not provided because it requires either an empty
 /// sequence or one with trailing punctuation.
 ///
@@ -1886,8 +1926,6 @@ where
     P: Parse,
 {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
-        use crate::syn::parse::discouraged::Speculative;
-
         let head: T = input.parse()?;
         let mut inner = syn::punctuated::Punctuated::new();
 
@@ -3170,6 +3208,342 @@ where
             RightAssoc::Lhs(lhs) => {
                 lhs.to_tokens(tokens);
             }
+        }
+    }
+}
+
+/// Generic dichotomous alternation.
+///
+/// ```rust
+/// # use parsel::{Error, Result};
+/// # use parsel::ast::{LitInt, Word, Either};
+/// #
+/// let x: Either<LitInt, Word> = "1234567890".parse()?;
+/// assert_eq!(x.as_ref().left().unwrap().value(), 1234567890);
+/// assert_eq!(x.as_ref().right(), None);
+/// assert_eq!(x.to_string(), "1234567890");
+///
+/// let y: Either<LitInt, Word> = "i_am_an_ident".parse()?;
+/// assert_eq!(y.as_ref().right().unwrap().to_string(), "i_am_an_ident");
+/// assert_eq!(y.as_ref().left(), None);
+/// assert_eq!(y.to_string(), "i_am_an_ident");
+///
+/// let bad: Result<Either<LitInt, Word>> = "184.3549".parse();
+/// assert!(bad.is_err());
+/// #
+/// # Ok::<(), Error>(())
+/// ```
+#[must_use]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Either<L, R> {
+    Left(L),
+    Right(R),
+}
+
+impl<L, R> Either<L, R> {
+    pub fn left(self) -> Option<L> {
+        match self {
+            Either::Left(left) => Some(left),
+            Either::Right(_)   => None,
+        }
+    }
+
+    pub fn right(self) -> Option<R> {
+        match self {
+            Either::Left(_)      => None,
+            Either::Right(right) => Some(right),
+        }
+    }
+
+    pub fn is_left(&self) -> bool {
+        matches!(self, Either::Left(_))
+    }
+
+    pub fn is_right(&self) -> bool {
+        matches!(self, Either::Right(_))
+    }
+
+    /// ```rust
+    /// # use parsel::ast::Either;
+    /// #
+    /// let left: Either::<String, ()> = Either::Left(String::from("left"));
+    /// let right: Either<(), String> = left.flip();
+    /// assert_eq!(right, Either::Right(String::from("left")));
+    /// ```
+    pub fn flip(self) -> Either<R, L> {
+        match self {
+            Either::Left(left)   => Either::Right(left),
+            Either::Right(right) => Either::Left(right),
+        }
+    }
+
+    pub fn as_ref(&self) -> Either<&L, &R> {
+        match *self {
+            Either::Left(ref left)   => Either::Left(left),
+            Either::Right(ref right) => Either::Right(right),
+        }
+    }
+
+    pub fn as_mut(&mut self) -> Either<&mut L, &mut R> {
+        match *self {
+            Either::Left(ref mut left)   => Either::Left(left),
+            Either::Right(ref mut right) => Either::Right(right),
+        }
+    }
+
+    /// ```rust
+    /// # use parsel::ast::Either;
+    /// #
+    /// let left: Either<u32, &str> = Either::Left(752_u32);
+    /// let right: Either<u32, &str> = Either::Right("some words");
+    ///
+    /// let left_mapped: Either<u32, String> = left.map(|x| x + 1, |s| s.to_string());
+    /// let right_mapped: Either<u32, usize> = right.map(|x| x + 1, |s| s.len());
+    ///
+    /// assert_eq!(left_mapped, Either::Left(753_u32));
+    /// assert_eq!(right_mapped, Either::Right(10_usize));
+    /// ```
+    pub fn map<T, U, F, G>(self, f: F, g: G) -> Either<T, U>
+    where
+        F: FnOnce(L) -> T,
+        G: FnOnce(R) -> U,
+    {
+        match self {
+            Either::Left(left)   => Either::Left(f(left)),
+            Either::Right(right) => Either::Right(g(right)),
+        }
+    }
+
+    /// This is not `impl IntoIterator` because that would conflict
+    /// with the `Iterator` impl, and it is more ergonomics to have
+    /// `Iterator` to be the actual trait impl and `into_iter()` an
+    /// inherent associated function.
+    #[allow(clippy::should_implement_trait)]
+    pub fn into_iter(self) -> Either<L::IntoIter, R::IntoIter>
+    where
+        L: IntoIterator,
+        R: IntoIterator,
+    {
+        self.map(L::into_iter, R::into_iter)
+    }
+}
+
+impl<L, R> Either<Option<L>, Option<R>> {
+    pub fn transpose(self) -> Option<Either<L, R>> {
+        match self {
+            Either::Left(left)   => left.map(Either::Left),
+            Either::Right(right) => right.map(Either::Right),
+        }
+    }
+}
+
+impl<L, R> Either<Result<L>, Result<R>> {
+    pub fn transpose(self) -> Result<Either<L, R>> {
+        match self {
+            Either::Left(left)   => left.map(Either::Left),
+            Either::Right(right) => right.map(Either::Right),
+        }
+    }
+}
+
+impl<T> Either<T, T> {
+    pub fn into_inner(self) -> T {
+        match self {
+            Either::Left(left)   => left,
+            Either::Right(right) => right,
+        }
+    }
+}
+
+impl<T> AsRef<T> for Either<T, T> {
+    fn as_ref(&self) -> &T {
+        match self {
+            Either::Left(left)   => left,
+            Either::Right(right) => right,
+        }
+    }
+}
+
+impl<T> AsMut<T> for Either<T, T> {
+    fn as_mut(&mut self) -> &mut T {
+        match self {
+            Either::Left(left)   => left,
+            Either::Right(right) => right,
+        }
+    }
+}
+
+impl<T> Deref for Either<T, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Either::Left(left)   => left,
+            Either::Right(right) => right,
+        }
+    }
+}
+
+impl<T> DerefMut for Either<T, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self {
+            Either::Left(left)   => left,
+            Either::Right(right) => right,
+        }
+    }
+}
+
+impl<L, R> Iterator for Either<L, R>
+where
+    L: Iterator,
+    R: Iterator,
+{
+    type Item = Either<L::Item, R::Item>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.as_mut()
+            .map(L::next, R::next)
+            .transpose()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.as_ref()
+            .map(L::size_hint, R::size_hint)
+            .into_inner()
+    }
+
+    fn count(self) -> usize {
+        self.map(L::count, R::count).into_inner()
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.as_mut()
+            .map(|left| left.nth(n), |right| right.nth(n))
+            .transpose()
+    }
+
+    fn last(self) -> Option<Self::Item> {
+        self.map(L::last, R::last).transpose()
+    }
+}
+
+impl<L, R> DoubleEndedIterator for Either<L, R>
+where
+    L: DoubleEndedIterator,
+    R: DoubleEndedIterator,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.as_mut()
+            .map(L::next_back, R::next_back)
+            .transpose()
+    }
+}
+
+impl<L, R> ExactSizeIterator for Either<L, R>
+where
+    L: ExactSizeIterator,
+    R: ExactSizeIterator,
+{
+}
+
+impl<L, R> FusedIterator for Either<L, R>
+where
+    L: FusedIterator,
+    R: FusedIterator,
+{
+}
+
+impl<L, R, T> Extend<T> for Either<L, R>
+where
+    L: Extend<T>,
+    R: Extend<T>,
+{
+    fn extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = T>
+    {
+        match self {
+            Either::Left(left)   => left.extend(iter),
+            Either::Right(right) => right.extend(iter),
+        }
+    }
+}
+
+impl<L, R> FromStr for Either<L, R>
+where
+    L: Parse,
+    R: Parse,
+{
+    type Err = Error;
+
+    fn from_str(string: &str) -> Result<Self> {
+        syn::parse_str(string)
+    }
+}
+
+impl<L, R> Debug for Either<L, R>
+where
+    L: Debug,
+    R: Debug,
+{
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Either::Left(left)   => Debug::fmt(left, formatter),
+            Either::Right(right) => Debug::fmt(right, formatter),
+        }
+    }
+}
+
+impl<L, R> Display for Either<L, R>
+where
+    L: Display,
+    R: Display,
+{
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Either::Left(left)   => Display::fmt(left, formatter),
+            Either::Right(right) => Display::fmt(right, formatter),
+        }
+    }
+}
+
+impl<L, R> Parse for Either<L, R>
+where
+    L: Parse,
+    R: Parse,
+{
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
+        let left_fork = input.fork();
+        let left_error = match left_fork.parse::<L>() {
+            Ok(left) => {
+                input.advance_to(&left_fork);
+                return Ok(Either::Left(left));
+            }
+            Err(error) => error,
+        };
+
+        let right_fork = input.fork();
+        let right_error = match right_fork.parse::<R>() {
+            Ok(right) => {
+                input.advance_to(&right_fork);
+                return Ok(Either::Right(right));
+            }
+            Err(error) => error,
+        };
+
+        Err(max_by_key(left_error, right_error, |e| e.span().end()))
+    }
+}
+
+impl<L, R> ToTokens for Either<L, R>
+where
+    L: ToTokens,
+    R: ToTokens,
+{
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Either::Left(left)   => left.to_tokens(tokens),
+            Either::Right(right) => right.to_tokens(tokens),
         }
     }
 }
