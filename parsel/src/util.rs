@@ -1,8 +1,11 @@
 //! Helper functions, types and macros that didn't fit anywhere else.
 
+use core::cmp::max_by_key;
 use core::fmt::{self, Debug, Display, Formatter, Write};
 use proc_macro2::{TokenStream, TokenTree, Spacing, Delimiter};
-use crate::{Error, Span, Spanned};
+use syn::parse::{ParseStream, discouraged::Speculative};
+use quote::ToTokens;
+use crate::{Error, Result, Span, Spanned};
 
 /// Similar to `syn::parse_quote!`, but instead of panicking, it returns an
 /// `Err` if the inferred type fails to parse from the specified token stream.
@@ -190,6 +193,43 @@ pub fn chain_error<T: Display>(
     Error::new(cause.span(), message)
 }
 
+/// Not public API -- runtime helper for `parsel_derive::Parse`.
+///
+/// Speculatively parse a sub-production of an alternation (`enum`).
+/// Only advances the input if the parse succeeds.
+///
+/// If parsing fails, and this production got farther in the input
+/// than all previous ones, then it updates the error location and
+/// message so that it points to this sub-production. This heuristic
+/// is based on the observation that the intended production in an
+/// alternation that failed to parse was most likely the one that
+/// produced the longest successful partial parse.
+#[doc(hidden)]
+pub fn try_parse_variant<T, F>(
+    input: ParseStream<'_>,
+    error_acc: Option<Error>,
+    parser: F,
+) -> Result<T>
+where
+    F: FnOnce(ParseStream<'_>) -> Result<T>,
+{
+    let fork = input.fork();
+
+    match parser(&fork) {
+        Ok(value) => {
+            input.advance_to(&fork);
+            Ok(value)
+        }
+        Err(error) => {
+            let farthest = match error_acc {
+                Some(acc) => max_by_key(acc, error, |e| e.span().end()),
+                None => error,
+            };
+            Err(farthest)
+        }
+    }
+}
+
 /// Helper type for correctly and reasonably "pretty"-printing any `TokenStream` in
 /// a grammar- and language-agnostic way. This mostly means dealing with parentheses,
 /// so that nested structures don't end up on one single long line.
@@ -275,7 +315,7 @@ where
     /// let err = TokenStreamFormatter::with_indent("  not ws ", Cursor::new(&[] as &[u8]));
     /// assert!(err.is_err());
     /// ```
-    pub fn with_indent(indent_string: S, writer: W) -> Result<Self, Error> {
+    pub fn with_indent(indent_string: S, writer: W) -> Result<Self> {
         if indent_string.as_ref().trim().is_empty() {
             Ok(TokenStreamFormatter {
                 indent_level: 0,
@@ -293,7 +333,7 @@ where
     S: AsRef<str>,
     W: Write,
 {
-    pub fn write(&mut self, stream: TokenStream) -> core::fmt::Result {
+    pub fn write(&mut self, stream: TokenStream) -> fmt::Result {
         self.write_indent()?;
         let mut spacing = Spacing::Joint;
         let mut iter = stream.into_iter().peekable();
@@ -355,7 +395,14 @@ where
         Ok(())
     }
 
-    fn write_indent(&mut self) -> core::fmt::Result {
+    pub fn write_node<T>(&mut self, node: &T) -> fmt::Result
+    where
+        T: ?Sized + ToTokens,
+    {
+        self.write(node.to_token_stream())
+    }
+
+    fn write_indent(&mut self) -> fmt::Result {
         for _ in 0..self.indent_level {
             self.writer.write_str(self.indent_string.as_ref())?;
         }
@@ -372,4 +419,14 @@ impl<W> TokenStreamFormatter<&'static str, W> {
             writer,
         }
     }
+}
+
+/// Helper for implementing `Display` in terms of `ToTokens`.
+pub fn pretty_print_tokens<T, W>(node: &T, writer: W) -> fmt::Result
+where
+    T: ?Sized + ToTokens,
+    W: Write,
+{
+    let mut formatter = TokenStreamFormatter::new(writer);
+    formatter.write_node(node)
 }

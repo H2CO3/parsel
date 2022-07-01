@@ -18,10 +18,10 @@ use ordered_float::NotNan;
 use syn::spanned::Spanned;
 use syn::ext::IdentExt;
 use syn::parse::{Error, Result, Parse, ParseStream};
+use syn::parse::discouraged::Speculative;
 use syn::punctuated::{Pair, IntoIter, Iter, IterMut, IntoPairs, Pairs, PairsMut};
-use crate::syn::parse::discouraged::Speculative;
 use quote::{ToTokens, TokenStreamExt};
-use crate::util::TokenStreamFormatter;
+use crate::util::pretty_print_tokens;
 
 pub use proc_macro2::Ident;
 pub use syn::Token;
@@ -861,9 +861,7 @@ where
     T: ToTokens,
 {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        let stream = self.to_token_stream();
-        let mut ts_fmt = TokenStreamFormatter::new(formatter);
-        ts_fmt.write(stream)
+        pretty_print_tokens(self, formatter)
     }
 }
 
@@ -1007,9 +1005,7 @@ impl<T> AsRef<T> for Paren<T> {
 
 impl<T: ToTokens> Display for Paren<T> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        let stream = self.to_token_stream();
-        let mut ts_fmt = TokenStreamFormatter::new(formatter);
-        ts_fmt.write(stream)
+        pretty_print_tokens(self, formatter)
     }
 }
 
@@ -1126,9 +1122,7 @@ impl<T> AsRef<T> for Bracket<T> {
 
 impl<T: ToTokens> Display for Bracket<T> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        let stream = self.to_token_stream();
-        let mut ts_fmt = TokenStreamFormatter::new(formatter);
-        ts_fmt.write(stream)
+        pretty_print_tokens(self, formatter)
     }
 }
 
@@ -1252,9 +1246,7 @@ impl<T> AsRef<T> for Brace<T> {
 
 impl<T: ToTokens> Display for Brace<T> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        let stream = self.to_token_stream();
-        let mut ts_fmt = TokenStreamFormatter::new(formatter);
-        ts_fmt.write(stream)
+        pretty_print_tokens(self, formatter)
     }
 }
 
@@ -1505,9 +1497,7 @@ where
     P: ToTokens,
 {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        let stream = self.to_token_stream();
-        let mut ts_fmt = TokenStreamFormatter::new(formatter);
-        ts_fmt.write(stream)
+        pretty_print_tokens(self, formatter)
     }
 }
 
@@ -1921,9 +1911,7 @@ where
     P: ToTokens,
 {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        let stream = self.to_token_stream();
-        let mut ts_fmt = TokenStreamFormatter::new(formatter);
-        ts_fmt.write(stream)
+        pretty_print_tokens(self, formatter)
     }
 }
 
@@ -2196,9 +2184,7 @@ where
     T: ToTokens
 {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        let stream = self.to_token_stream();
-        let mut ts_fmt = TokenStreamFormatter::new(formatter);
-        ts_fmt.write(stream)
+        pretty_print_tokens(self, formatter)
     }
 }
 
@@ -3245,9 +3231,7 @@ where
     R: ToTokens,
 {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        let stream = self.to_token_stream();
-        let mut ts_fmt = TokenStreamFormatter::new(formatter);
-        ts_fmt.write(stream)
+        pretty_print_tokens(self, formatter)
     }
 }
 
@@ -3440,9 +3424,7 @@ where
     L: ToTokens,
 {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        let stream = self.to_token_stream();
-        let mut ts_fmt = TokenStreamFormatter::new(formatter);
-        ts_fmt.write(stream)
+        pretty_print_tokens(self, formatter)
     }
 }
 

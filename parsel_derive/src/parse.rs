@@ -5,7 +5,7 @@ use syn::{Error, Result, DeriveInput, Data, DataStruct, DataEnum, Fields, Varian
 use syn::{Token, Ident};
 use syn::punctuated::Punctuated;
 use syn::parse_quote;
-use quote::{quote, format_ident};
+use quote::quote;
 use crate::util::add_bounds;
 
 
@@ -46,6 +46,9 @@ fn expand_fields(enum_name: Option<&Ident>, ctor_name: &Ident, fields: &Fields) 
     let ctor_str = ctor_name.to_string();
     let enum_name = enum_name.into_iter();
 
+    // It is correct to rely on the evaluation order being left-to-right
+    // in source order, in the case of both named and tuple fields:
+    // https://doc.rust-lang.org/reference/expressions.html#evaluation-order-of-operands
     match fields {
         Fields::Named(fields) => {
             let inits: Vec<_> = fields.named
@@ -97,24 +100,15 @@ fn expand_enum(ty_name: &Ident, data: &DataEnum) -> Result<TokenStream> {
     let parsers = expand_variants(ty_name, &data.variants)?;
 
     Ok(quote!{
-        // This is only added so that the non-inherent methods don't break.
-        use ::core::iter::{Iterator, IntoIterator};
-
-        let mut errors = ::std::vec::Vec::new();
+        let mut error = ::core::option::Option::None;
 
         #parsers
 
-        // Heuristic: choose the error that got the furthest in parsing.
-        // That is likely to be the thing that is _actually_ being parsed.
-        // If no variant succeeds but there are no errors, then the
-        // enum to be parsed was uninhabited (no variants). Return an
-        // appropriate error in this case.
-        let error = errors
-            .into_iter()
-            .max_by_key(|e| e.span().end())
-            .unwrap_or_else(|| input.error("parsing an empty choice (enum) always fails"));
-
-        ::parsel::Result::Err(error)
+        Err(
+            error.unwrap_or_else(|| {
+                input.error("parsing an empty choice (enum) always fails")
+            })
+        )
     })
 }
 
@@ -124,28 +118,15 @@ fn expand_variants(ty_name: &Ident, variants: &Punctuated<Variant, Token![,]>) -
     variants
         .iter()
         .map(|variant| {
-            let variant_name = &variant.ident;
-            let body = expand_fields(Some(ty_name), variant_name, &variant.fields)?;
-
-            let fork_name = format_ident!("parsel_fork_{}", variant_name);
-            let parser_fn_name = format_ident!("parsel_parse_{}", variant_name);
+            let body = expand_fields(Some(ty_name), &variant.ident, &variant.fields)?;
 
             Ok(quote!{
-                let #parser_fn_name = |input: ::parsel::syn::parse::ParseStream<'_>| -> ::parsel::Result<_> {
-                    #body
-                };
-                let #fork_name = ::parsel::syn::parse::ParseBuffer::fork(input);
+                let result = ::parsel::util::try_parse_variant(input, error, |input| { #body });
 
-                match #parser_fn_name(&#fork_name) {
-                    ::parsel::Result::Ok(ast) => {
-                        ::parsel::syn::parse::discouraged::Speculative::advance_to(
-                            input,
-                            &#fork_name
-                        );
-                        return ::parsel::Result::Ok(ast);
-                    }
-                    ::parsel::Result::Err(cause) => {
-                        errors.push(cause);
+                match result {
+                    ::parsel::Result::Ok(_) => return result,
+                    ::parsel::Result::Err(err) => {
+                        error = ::core::option::Option::Some(err);
                     }
                 }
             })
