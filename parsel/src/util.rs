@@ -1,11 +1,12 @@
 //! Helper functions, types and macros that didn't fit anywhere else.
 
 use core::cmp::max_by_key;
+use core::ops::Range;
 use core::fmt::{self, Debug, Display, Formatter, Write};
 use proc_macro2::{TokenStream, TokenTree, Spacing, Delimiter};
 use syn::parse::{ParseStream, discouraged::Speculative};
 use quote::ToTokens;
-use crate::{Error, Result, Span, Spanned};
+use crate::{Error, Result, Span, Spanned, LineColumn};
 
 /// Similar to `syn::parse_quote!`, but instead of panicking, it returns an
 /// `Err` if the inferred type fails to parse from the specified token stream.
@@ -88,18 +89,130 @@ macro_rules! try_parse_quote_spanned {
     }
 }
 
-/// Extension trait for formatting the span of AST nodes in a human-readable manner.
-pub trait FormatSpan: Spanned {
+/// Extension trait for formatting the span of AST nodes in a human-readable manner,
+/// and for (re-)computing byte offsets into the source based on the line/column
+/// location, since this information is not exposed by the public API of `Span`.
+pub trait SpannedExt: Spanned {
     fn format_span(&self) -> SpanDisplay;
+
+    fn byte_range(&self, source: &str) -> Range<usize>;
+
+    fn char_range(&self, source: &str) -> Range<usize>;
 }
 
-impl<T> FormatSpan for T
+impl<T> SpannedExt for T
 where
     T: ?Sized + Spanned
 {
     fn format_span(&self) -> SpanDisplay {
         SpanDisplay::new(self.span())
     }
+
+    /// TODO(H2CO3): a faster, less naive implementation would be great.
+    /// We should use the byte offset of `start` to compute that of `end`,
+    /// sparing the double scan of the source up until the start location.
+    ///
+    /// ```rust
+    /// # use parsel::{Error, Result};
+    /// # use parsel::util::SpannedExt;
+    /// # use parsel::ast::{Lit, Many};
+    /// #
+    /// let source = r#"
+    ///    -3.667
+    ///   1248  "string ű literal"
+    ///       "wíőzs"
+    /// "#;
+    /// let tokens: Many<Lit> = source.parse()?;
+    ///
+    /// assert_eq!(tokens.len(), 4);
+    /// assert_eq!(tokens[0].byte_range(source),  4..10);
+    /// assert_eq!(tokens[1].byte_range(source), 13..17);
+    /// assert_eq!(tokens[2].byte_range(source), 19..38);
+    /// assert_eq!(tokens[3].byte_range(source), 45..54);
+    /// #
+    /// # Result::<()>::Ok(())
+    /// ```
+    fn byte_range(&self, source: &str) -> Range<usize> {
+        let span = self.span();
+        let start = byte_offset(source, span.start());
+        let end = byte_offset(source, span.end());
+
+        start..end
+    }
+
+    /// TODO(H2CO3): a faster, less naive implementation would be great.
+    /// We should use the char offset of `start` to compute that of `end`,
+    /// sparing the double scan of the source up until the start location.
+    ///
+    /// ```rust
+    /// # use parsel::{Error, Result};
+    /// # use parsel::util::SpannedExt;
+    /// # use parsel::ast::{Lit, Many};
+    /// #
+    /// let source = r#"
+    ///    -3.667
+    ///   1248  "string ű literal"
+    ///       "wíőzs"
+    /// "#;
+    /// let tokens: Many<Lit> = source.parse()?;
+    ///
+    /// assert_eq!(tokens.len(), 4);
+    /// assert_eq!(tokens[0].char_range(source),  4..10);
+    /// assert_eq!(tokens[1].char_range(source), 13..17);
+    /// assert_eq!(tokens[2].char_range(source), 19..37);
+    /// assert_eq!(tokens[3].char_range(source), 44..51);
+    /// #
+    /// # Result::<()>::Ok(())
+    /// ```
+    fn char_range(&self, source: &str) -> Range<usize> {
+        let span = self.span();
+        let start = char_offset(source, span.start());
+        let end = char_offset(source, span.end());
+
+        start..end
+    }
+}
+
+/// Compute byte offset from line and column because
+/// we can't directly get the byte range of a `Span`.
+fn byte_offset(source: &str, loc: LineColumn) -> usize {
+    // split including newlines so that they are also counted
+    let mut lines = source.split_inclusive('\n');
+
+    // byte offset of all lines except the current one
+    let line_offset: usize = lines
+        .by_ref()
+        .take(loc.line.saturating_sub(1))
+        .map(str::len)
+        .sum();
+
+    // byte offset within the current line
+    let char_offset: usize = lines.next().map_or(0, |line| {
+        line.char_indices()
+            .nth(loc.column)
+            .map_or(line.len(), |(index, _)| index)
+    });
+
+    line_offset + char_offset
+}
+
+/// Compute char offset from line and column because
+/// we can't directly get the byte range of a `Span`.
+fn char_offset(source: &str, loc: LineColumn) -> usize {
+    // split including newlines so that they are also counted
+    let mut lines = source.split_inclusive('\n');
+
+    // `char` offset of all lines except the current one
+    let line_offset: usize = lines
+        .by_ref()
+        .take(loc.line.saturating_sub(1))
+        .flat_map(str::chars)
+        .count();
+
+    // `char` offset within the current line
+    let char_offset = loc.column;
+
+    line_offset + char_offset
 }
 
 /// Helper type that formats a `Span` in a human-readable way.
@@ -107,7 +220,7 @@ where
 /// ```rust
 /// # use parsel::{Error, Parse, TokenStream};
 /// # use parsel::ast::{Token, Word, Separated};
-/// # use parsel::util::FormatSpan;
+/// # use parsel::util::SpannedExt;
 /// #
 /// #[derive(Clone, Debug, Parse)]
 /// struct HttpHeader {

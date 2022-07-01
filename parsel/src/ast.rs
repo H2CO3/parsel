@@ -9,6 +9,7 @@ use core::iter::{FromIterator, FusedIterator};
 use core::convert::TryFrom;
 use core::str::FromStr;
 use core::num::NonZeroUsize;
+use core::slice::SliceIndex;
 use core::hash::{Hash, Hasher};
 use core::ops::{Deref, DerefMut, Index, IndexMut};
 use core::fmt::{self, Debug, Display, Formatter};
@@ -2034,6 +2035,20 @@ impl<T> Any<T> {
         self.inner.is_empty()
     }
 
+    pub fn get<I>(&self, index: I) -> Option<&I::Output>
+    where
+        I: SliceIndex<[T]>
+    {
+        self.inner.get(index)
+    }
+
+    pub fn get_mut<I>(&mut self, index: I) -> Option<&mut I::Output>
+    where
+        I: SliceIndex<[T]>
+    {
+        self.inner.get_mut(index)
+    }
+
     pub fn iter(&self) -> core::slice::Iter<'_, T> {
         self.inner.iter()
     }
@@ -2167,6 +2182,26 @@ impl<'a, T> IntoIterator for &'a mut Any<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.inner.iter_mut()
+    }
+}
+
+impl<T, I> Index<I> for Any<T>
+where
+    I: SliceIndex<[T]>
+{
+    type Output = <I as SliceIndex<[T]>>::Output;
+
+    fn index(&self, index: I) -> &Self::Output {
+        &self.inner[index]
+    }
+}
+
+impl<T, I> IndexMut<I> for Any<T>
+where
+    I: SliceIndex<[T]>
+{
+    fn index_mut(&mut self, index: I) -> &mut Self::Output {
+        &mut self.inner[index]
     }
 }
 

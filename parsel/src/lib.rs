@@ -60,7 +60,7 @@ pub use quote;
 
 pub use core::str::FromStr;
 pub use core::fmt::Display;
-pub use proc_macro2::{TokenStream, TokenTree, Span};
+pub use proc_macro2::{TokenStream, TokenTree, Span, LineColumn};
 pub use ordered_float::NotNan;
 pub use syn::parse::{Parse, Error, Result};
 pub use syn::{parse2, parse_str};
