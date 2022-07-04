@@ -4,7 +4,7 @@
 //! * Parenthesization, delimiting
 //! * Separation of consecutive items
 
-use core::cmp::max_by_key;
+use core::cmp::{max_by_key, PartialOrd, Ord, Ordering};
 use core::iter::{FromIterator, FusedIterator};
 use core::convert::TryFrom;
 use core::str::FromStr;
@@ -2327,6 +2327,12 @@ macro_rules! impl_literal {
             }
         }
 
+        impl Borrow<$raw> for $name {
+            fn borrow(&self) -> &$raw {
+                &self.value
+            }
+        }
+
         impl PartialEq<Self> for $name {
             fn eq(&self, other: &Self) -> bool {
                 self.value == other.value
@@ -2340,6 +2346,24 @@ macro_rules! impl_literal {
         }
 
         impl Eq for $name {}
+
+        impl PartialOrd<Self> for $name {
+            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+                self.cmp(other).into()
+            }
+        }
+
+        impl PartialOrd<$raw> for $name {
+            fn partial_cmp(&self, other: &$raw) -> Option<Ordering> {
+                self.value.cmp(other).into()
+            }
+        }
+
+        impl Ord for $name {
+            fn cmp(&self, other: &Self) -> Ordering {
+                self.value.cmp(&other.value)
+            }
+        }
 
         impl Hash for $name {
             fn hash<H: Hasher>(&self, state: &mut H) {
@@ -2653,6 +2677,24 @@ impl Deref for LitStr {
     }
 }
 
+impl Borrow<str> for LitStr {
+    fn borrow(&self) -> &str {
+        &self.value
+    }
+}
+
+impl PartialEq<str> for LitStr {
+    fn eq(&self, other: &str) -> bool {
+        self.value == other
+    }
+}
+
+impl PartialOrd<str> for LitStr {
+    fn partial_cmp(&self, other: &str) -> Option<Ordering> {
+        self.value.as_str().cmp(other).into()
+    }
+}
+
 impl From<syn::LitByteStr> for LitByteStr {
     fn from(lit: syn::LitByteStr) -> Self {
         LitByteStr::new(lit.value(), lit.span())
@@ -2718,6 +2760,30 @@ impl Deref for LitByteStr {
 impl DerefMut for LitByteStr {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.value
+    }
+}
+
+impl Borrow<[u8]> for LitByteStr {
+    fn borrow(&self) -> &[u8] {
+        &self.value
+    }
+}
+
+impl BorrowMut<[u8]> for LitByteStr {
+    fn borrow_mut(&mut self) -> &mut [u8] {
+        &mut self.value
+    }
+}
+
+impl PartialEq<[u8]> for LitByteStr {
+    fn eq(&self, other: &[u8]) -> bool {
+        self.value == other
+    }
+}
+
+impl PartialOrd<[u8]> for LitByteStr {
+    fn partial_cmp(&self, other: &[u8]) -> Option<Ordering> {
+        self.value.as_slice().cmp(other).into()
     }
 }
 
