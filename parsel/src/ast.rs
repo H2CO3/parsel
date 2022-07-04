@@ -60,6 +60,10 @@ impl<K> CustomIdent<K> {
     pub fn set_span(&mut self, span: Span) {
         self.ident.set_span(span);
     }
+
+    pub fn token(&self) -> Ident {
+        self.ident.clone()
+    }
 }
 
 impl<K, T> PartialEq<T> for CustomIdent<K>
