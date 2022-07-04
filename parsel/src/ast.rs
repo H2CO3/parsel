@@ -594,7 +594,7 @@ impl ToTokens for NotEof {
     fn to_tokens(&self, _tokens: &mut TokenStream) {}
 }
 
-/// Parses an optional expression introduced by a single-token lookahead.
+/// Parses an optional expression introduced by some lookahead tokens.
 ///
 /// ```rust
 /// # use parsel::{parse_quote, Parse, ToTokens};
