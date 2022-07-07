@@ -6,7 +6,6 @@ use proc_macro2::TokenStream as TokenStream2;
 use darling::FromMeta;
 use syn::parse_quote;
 use syn::punctuated::Punctuated;
-use syn::spanned::Spanned;
 use syn::{Error, Result, Token, DeriveInput, Fields, Data, Field, Type};
 use syn::{WhereClause, WherePredicate, TypeParamBound, Attribute, NestedMeta};
 
@@ -17,9 +16,8 @@ pub fn add_bounds(
     where_clause: Option<&WhereClause>,
     bounds: Punctuated<TypeParamBound, Token![+]>,
 ) -> Result<WhereClause> {
-    let span = input.span();
     let unique_types: HashSet<_> = match &input.data {
-        Data::Union(_) => return Err(Error::new(span, "unions are not supported")),
+        Data::Union(_) => return Err(Error::new_spanned(input, "unions are not supported")),
         Data::Struct(data) => match &data.fields {
             Fields::Unit => HashSet::new(),
             Fields::Named(fields) => {

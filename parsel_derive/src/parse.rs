@@ -15,7 +15,7 @@ pub fn expand(stream: TokenStream) -> Result<TokenStream> {
     let ty_name = &item.ident;
 
     let body = match &item.data {
-        Data::Union(_) => return Err(Error::new(ty_name.span(), "unions are not supported")),
+        Data::Union(_) => return Err(Error::new_spanned(&item, "unions are not supported")),
         Data::Enum(data) => expand_enum(ty_name, data)?,
         Data::Struct(data) => expand_struct(ty_name, data)?,
     };

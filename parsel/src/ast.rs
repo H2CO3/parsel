@@ -1790,7 +1790,7 @@ where
 
     fn try_from(inner: syn::punctuated::Punctuated<T, P>) -> Result<Self> {
         if inner.empty_or_trailing() {
-            Err(Error::new(inner.span(), "empty sequence or trailing punctuation"))
+            Err(Error::new_spanned(inner, "empty sequence or trailing punctuation"))
         } else {
             Ok(Separated { inner })
         }
