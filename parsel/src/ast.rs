@@ -262,7 +262,7 @@ macro_rules! define_keywords {
                         $name { span }
                     }
 
-                    pub fn as_str(&self) -> &'static str {
+                    pub fn as_str(&self) -> &'static ::core::primitive::str {
                         ::core::stringify!($kw)
                     }
 
@@ -291,13 +291,13 @@ macro_rules! define_keywords {
                     }
                 }
 
-                // These traits are implemented manually because `Span: !PartialEq + !Hash`
-                impl ::core::cmp::PartialEq for $name {
-                    fn eq(&self, _other: &Self) -> bool {
-                        true
+                impl ::core::convert::AsRef<::core::primitive::str> for $name {
+                    fn as_ref(&self) -> &::core::primitive::str {
+                        self.as_str()
                     }
                 }
 
+                // These traits are implemented manually because `Span: !PartialEq + !Hash`
                 impl<T> ::core::cmp::PartialEq<T> for $name
                 where
                     T: ::core::convert::AsRef<::core::primitive::str>
