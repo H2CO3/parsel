@@ -309,9 +309,14 @@ macro_rules! define_keywords {
 
                 impl ::core::cmp::Eq for $name {}
 
-                impl ::core::cmp::PartialOrd for $name {
-                    fn partial_cmp(&self, other: &Self) -> ::core::option::Option<::core::cmp::Ordering> {
-                        ::core::option::Option::Some(::core::cmp::Ord::cmp(self, other))
+                impl<T> ::core::cmp::PartialOrd<T> for $name
+                where
+                    T: ::core::convert::AsRef<::core::primitive::str>
+                {
+                    fn partial_cmp(&self, other: &T) -> ::core::option::Option<::core::cmp::Ordering> {
+                        ::core::option::Option::Some(
+                            ::core::cmp::Ord::cmp(self.as_str(), ::core::convert::AsRef::as_ref(other))
+                        )
                     }
                 }
 
