@@ -258,15 +258,15 @@ macro_rules! define_keywords {
                 }
 
                 impl $name {
-                    pub fn new(span: ::parsel::Span) -> Self {
+                    pub const fn new(span: ::parsel::Span) -> Self {
                         $name { span }
                     }
 
-                    pub fn as_str(&self) -> &'static ::core::primitive::str {
+                    pub const fn as_str(&self) -> &'static ::core::primitive::str {
                         ::core::stringify!($kw)
                     }
 
-                    pub fn span(&self) -> ::parsel::Span {
+                    pub const fn span(&self) -> ::parsel::Span {
                         self.span
                     }
 
