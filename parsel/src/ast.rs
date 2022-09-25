@@ -998,7 +998,6 @@ impl<T> From<(token::Paren, T)> for Paren<T> {
     }
 }
 
-/// Can't be `DerefMut` because of the span
 impl<T> Deref for Paren<T> {
     type Target = T;
 
@@ -1007,9 +1006,21 @@ impl<T> Deref for Paren<T> {
     }
 }
 
+impl<T> DerefMut for Paren<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
 impl<T> AsRef<T> for Paren<T> {
     fn as_ref(&self) -> &T {
         &self.inner
+    }
+}
+
+impl<T> AsMut<T> for Paren<T> {
+    fn as_mut(&mut self) -> &mut T {
+        &mut self.inner
     }
 }
 
@@ -1115,7 +1126,6 @@ impl<T> From<(token::Bracket, T)> for Bracket<T> {
     }
 }
 
-/// Can't be `DerefMut` because of the span
 impl<T> Deref for Bracket<T> {
     type Target = T;
 
@@ -1124,9 +1134,21 @@ impl<T> Deref for Bracket<T> {
     }
 }
 
+impl<T> DerefMut for Bracket<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
 impl<T> AsRef<T> for Bracket<T> {
     fn as_ref(&self) -> &T {
         &self.inner
+    }
+}
+
+impl<T> AsMut<T> for Bracket<T> {
+    fn as_mut(&mut self) -> &mut T {
+        &mut self.inner
     }
 }
 
@@ -1239,7 +1261,6 @@ impl<T> From<(token::Brace, T)> for Brace<T> {
     }
 }
 
-/// Can't be `DerefMut` because of the span
 impl<T> Deref for Brace<T> {
     type Target = T;
 
@@ -1248,9 +1269,21 @@ impl<T> Deref for Brace<T> {
     }
 }
 
+impl<T> DerefMut for Brace<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
 impl<T> AsRef<T> for Brace<T> {
     fn as_ref(&self) -> &T {
         &self.inner
+    }
+}
+
+impl<T> AsMut<T> for Brace<T> {
+    fn as_mut(&mut self) -> &mut T {
+        &mut self.inner
     }
 }
 
