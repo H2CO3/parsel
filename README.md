@@ -286,7 +286,7 @@ However, there is an important caveat regarding alternations (`enum`s) in the
 grammar. The way alternations can be parsed in a fully automatic and deceptively
 simple way is by attempting to parse each alternative production, one after the
 other, and pick the first one that parses successfully. However, if none of them
-parse, then it is not obvious to the parser which of the errors it should report.
+parses, then it is not obvious to the parser which of the errors it should report.
 
 The heuristic we use to solve this problem is that we use `Span` information to
 select the variant that got furthest in the token stream before having failed.
@@ -296,7 +296,7 @@ involving more than one token fails in the middle, it will have advanced further
 in the stream than other productions, which failed right at the very first token.
 
 However, if span information is not available or not useful (i.e., when every
-generated is spanned to the same `Span::call_site()` source location), then this
+production is spanned to the same `Span::call_site()` source location), then this
 heuristic breaks down, and it will select an arbitrary production, resulting in
 subpar error messages. This means that you should try to preserve spans as much
 as possible. This in turn implies that using `syn::parse_str()` for parsing code
@@ -308,6 +308,9 @@ not when used on e.g. a `TokenStream` obtained via `quote!()` or `parse_quote!()
 
 * [ ] Document all of the public API
 * [ ] Document all of the non-public API as well
+* [ ] Allow specifying custom error messages for each production/AST node type
+    * [ ] Allow conditions/sorting criteria/other customization for discovering
+          the best production/error message to report when parsing alternation
 * [x] `enum Either` AST helper type for basic binary alternation
 * [x] `Any` AST helper type for parsing until a given production succeeds. Unlike
       `Many`, it doesn't require the productions to extend until end-of-input.
