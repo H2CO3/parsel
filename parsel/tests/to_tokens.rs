@@ -36,7 +36,7 @@ fn print_struct_named_field() -> Result<()> {
         qmark: Default::default(),
         consequence: Lit::from("frobnicate"),
         colon: Default::default(),
-        alternative: Lit::from(42_u128),
+        alternative: Lit::from(42_u64),
     };
     let expected = quote!{
         has_frobnicator ? "frobnicate" : 42
@@ -61,7 +61,7 @@ fn print_struct_indexed_field() -> Result<()> {
     let actual = Conditional(
         ident("is_bug"),
         Default::default(),
-        Lit::from(13_i128),
+        Lit::from(13_i64),
         Default::default(),
         Lit::try_from(37.0).unwrap(),
     );
@@ -89,7 +89,7 @@ fn print_enum() -> Result<()> {
     let actual1 = Expr::Add {
         lhs: Lit::from("foo"),
         op: Default::default(),
-        rhs: Lit::from(987_i128),
+        rhs: Lit::from(987_i64),
     };
     let expected1 = quote!("foo" + 987);
     test_assert_eq_token_stream!(actual1, expected1);
@@ -196,7 +196,7 @@ fn print_recursive_type() -> Result<()> {
             rhs: Box::new(Expr::Lit(Lit::from(false))),
         }),
         op: Default::default(),
-        rhs: Box::new(Expr::Lit(Lit::from(192837_i128))),
+        rhs: Box::new(Expr::Lit(Lit::from(192837_i64))),
     };
     let expected_expr = quote!(xyz * false + 192837);
     test_assert_eq_token_stream!(actual_expr, expected_expr);
@@ -261,11 +261,11 @@ fn print_recursive_type() -> Result<()> {
     let mutual_actual = MutuallyRecursiveOne::Positive(
         Default::default(),
         MutuallyRecursiveTwo {
-            number: LitUint::from(11111_u128),
+            number: LitUint::from(11111_u64),
             next: Box::new(MutuallyRecursiveOne::Negative {
                 sign: token::Sub::default(),
                 num: MutuallyRecursiveTwo {
-                    number: LitUint::from(0_u128),
+                    number: LitUint::from(0_u64),
                     next: Box::new(MutuallyRecursiveOne::Nothing),
                 },
             }),

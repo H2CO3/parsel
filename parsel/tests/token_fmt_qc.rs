@@ -33,7 +33,7 @@ impl Arbitrary for TokenTreeGen {
         ]).unwrap();
 
         let token = match kind {
-            Token::LitInt => Literal::i128_unsuffixed(i128::arbitrary(gen)).into(),
+            Token::LitInt => Literal::i64_unsuffixed(i64::arbitrary(gen)).into(),
             Token::LitFloat => {
                 loop {
                     let x = f64::arbitrary(&mut *gen);

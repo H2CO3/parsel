@@ -25,7 +25,7 @@ use crate::{Error, Result, Span, Spanned, LineColumn};
 /// let expected: Many<Lit> = Many::from_iter([
 ///     Lit::from(true),
 ///     Lit::from("some text"),
-///     Lit::from(76192_u128),
+///     Lit::from(76192_u64),
 /// ]);
 ///
 /// assert_eq!(actual, expected);

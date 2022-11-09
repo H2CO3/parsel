@@ -533,7 +533,7 @@ impl ToTokens for Eof {
 /// let actual_short: SimpleBlock = "{ 54194; }".parse()?;
 /// let expected_short: SimpleBlock = Brace::new(
 ///     SimpleBlockBody {
-///         statement: Lit::from(54194_u128),
+///         statement: Lit::from(54194_u64),
 ///         semicolon: Semi::default(),
 ///         expression: Maybe::default(),
 ///     },
@@ -544,7 +544,7 @@ impl ToTokens for Eof {
 /// let actual_long: SimpleBlock = "{ 54194; true }".parse()?;
 /// let expected_long: SimpleBlock = Brace::new(
 ///     SimpleBlockBody {
-///         statement: Lit::from(54194_u128),
+///         statement: Lit::from(54194_u64),
 ///         semicolon: Semi::default(),
 ///         expression: Maybe::from(Lit::from(true)),
 ///     },
@@ -1330,7 +1330,7 @@ impl<T: ToTokens> ToTokens for Brace<T> {
 /// let items: Vec<Lit> = items.into_iter().collect();
 ///
 /// assert_eq!(items, [
-///     Lit::from(44_u128),
+///     Lit::from(44_u64),
 ///     Lit::from(true),
 ///     Lit::from("str liter"),
 ///     Lit::try_from(5.55).unwrap(),
@@ -1602,7 +1602,7 @@ where
 ///     KeyValue {
 ///         key: ident("key_one"),
 ///         arrow: Default::default(),
-///         value: Lit::from(678_u128),
+///         value: Lit::from(678_u64),
 ///     },
 ///     KeyValue {
 ///         key: ident("no_2"),
@@ -2434,8 +2434,8 @@ macro_rules! impl_literal {
 impl_literal!{
     bool        => LitBool;
     u8          => LitByte;
-    i128        => LitInt;
-    u128        => LitUint;
+    i64        => LitInt;
+    u64        => LitUint;
     NotNan<f64> => LitFloat;
     char        => LitChar;
     String      => LitStr;
@@ -2505,7 +2505,7 @@ impl LitByte {
 
 impl LitInt {
     pub fn token(&self) -> Literal {
-        let mut lit = Literal::i128_unsuffixed(self.value);
+        let mut lit = Literal::i64_unsuffixed(self.value);
         lit.set_span(self.span);
         lit
     }
@@ -2513,7 +2513,7 @@ impl LitInt {
 
 impl LitUint {
     pub fn token(&self) -> Literal {
-        let mut lit = Literal::u128_unsuffixed(self.value);
+        let mut lit = Literal::u64_unsuffixed(self.value);
         lit.set_span(self.span);
         lit
     }
@@ -2586,7 +2586,7 @@ impl TryFrom<syn::LitInt> for LitInt {
     type Error = Error;
 
     fn try_from(lit: syn::LitInt) -> Result<Self> {
-        let value: i128 = lit.base10_parse()?;
+        let value: i64 = lit.base10_parse()?;
         let span = lit.span();
         Ok(LitInt::new(value, span))
     }
@@ -2602,7 +2602,7 @@ impl TryFrom<syn::LitInt> for LitUint {
     type Error = Error;
 
     fn try_from(lit: syn::LitInt) -> Result<Self> {
-        let value: u128 = lit.base10_parse()?;
+        let value: u64 = lit.base10_parse()?;
         let span = lit.span();
         Ok(LitUint::new(value, span))
     }
@@ -2891,7 +2891,7 @@ impl Parse for LitByteStr {
 ///    false  6.283
 ///   100000023456         b'\xa3'
 ///       "foo bar baz" - 74819253
-///    -99887766554433221100
+///    -987766554433221100
 ///     b"This is a byte string! A literal one."
 /// "#;
 /// let parsel: Many<Lit> = parsel::parse_str(source).unwrap();
@@ -3009,8 +3009,8 @@ impl From<LitInt> for Lit {
     }
 }
 
-impl From<i128> for Lit {
-    fn from(value: i128) -> Self {
+impl From<i64> for Lit {
+    fn from(value: i64) -> Self {
         Lit::Int(value.into())
     }
 }
@@ -3021,8 +3021,8 @@ impl From<LitUint> for Lit {
     }
 }
 
-impl From<u128> for Lit {
-    fn from(value: u128) -> Self {
+impl From<u64> for Lit {
+    fn from(value: u64) -> Self {
         Lit::Uint(value.into())
     }
 }

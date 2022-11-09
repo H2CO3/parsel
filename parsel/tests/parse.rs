@@ -72,7 +72,7 @@ fn parse_enum() -> Result<()> {
         f1,
         Foo::Bar(
             ident("foo1"),
-            Lit::from(42_u128),
+            Lit::from(42_u64),
         )
     );
 
@@ -80,7 +80,7 @@ fn parse_enum() -> Result<()> {
     test_assert_eq!(
         f2,
         Foo::Qux {
-            first: Lit::from(-1337_i128),
+            first: Lit::from(-1337_i64),
             comma: Default::default(),
             second: Lit::try_from(0.5).unwrap(),
         }
@@ -136,7 +136,7 @@ fn parse_generic_type() -> Result<()> {
 
     let actual_enum_1: GenericEnum<LitUint, DoesNotImplParse, Token![=>]>
         = parsel::parse_str("42_usize")?;
-    let expected_enum_1 = GenericEnum::X1(LitUint::from(42_u128));
+    let expected_enum_1 = GenericEnum::X1(LitUint::from(42_u64));
     test_assert_eq!(actual_enum_1, expected_enum_1);
 
     let actual_enum_2: GenericEnum<LitUint, DoesNotImplParse, Token![=>]>
@@ -206,7 +206,7 @@ fn parse_recursive_type() -> Result<()> {
             )),
         )),
         op: Default::default(),
-        rhs: MulExpr::Term(Term::Lit(Lit::from(738291_u128))),
+        rhs: MulExpr::Term(Term::Lit(Lit::from(738291_u64))),
     };
     test_assert_eq!(actual_expr, expected_expr);
 
