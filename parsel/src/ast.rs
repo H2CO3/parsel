@@ -183,6 +183,11 @@ impl Word {
 /// `Keywords` marker type for [`CustomIdent`](ast/struct.CustomIdent.html) implementing
 /// [`KeywordList`](ast/trait.KeywordList.html).
 ///
+/// ## Caveats
+///
+/// Due to a limitation in Rust's macro system, if you want to match a bare underscore,
+/// `_` in itself, then you need to list it as the _last_ item in the list of keywords.
+///
 /// ```rust
 /// # use parsel::{define_keywords, Error, Result, TokenTree};
 /// # use parsel::quote::quote;
@@ -190,9 +195,10 @@ impl Word {
 /// #
 /// define_keywords!{
 ///     mod kw {
-///         Foo => foo;
-///         Bar => bar;
-///         Quux => quux;
+///         foo  => Foo;
+///         bar  => Bar;
+///         quux => Quux;
+///         _    => Underscore; // if present, the underscore has to be last
 ///     }
 /// }
 ///
@@ -213,11 +219,18 @@ impl Word {
 /// assert_eq!(id_multi_part, "multi_part");
 ///
 /// let _: kw::Bar = "bar".parse()?;
+/// let _: kw::Underscore = "_".parse()?;
 ///
 /// // Invalid keywords
 /// let invalid: Result<MyIdent> = "quux".parse();
 /// assert_eq!(
 ///     invalid.unwrap_err().to_string(),
+///     "expected identifier, found keyword",
+/// );
+///
+/// let invalid_underscore: Result<MyIdent> = "_".parse();
+/// assert_eq!(
+///     invalid_underscore.unwrap_err().to_string(),
 ///     "expected identifier, found keyword",
 /// );
 ///
@@ -249,130 +262,13 @@ impl Word {
 /// ```
 #[macro_export]
 macro_rules! define_keywords {
-    ($vis:vis mod $modname:ident { $($name:ident => $kw:ident;)* }) => {
+    ($vis:vis mod $modname:ident {
+        $($kw:ident => $name:ident;)*
+        $(_ => $underscore_name:ident;)?
+    }) => {
         $vis mod $modname {
-            $(
-                #[derive(Clone, Copy)]
-                pub struct $name {
-                    span: ::parsel::Span,
-                }
-
-                impl $name {
-                    pub const fn new(span: ::parsel::Span) -> Self {
-                        $name { span }
-                    }
-
-                    pub const fn as_str(&self) -> &'static ::core::primitive::str {
-                        ::core::stringify!($kw)
-                    }
-
-                    pub const fn span(&self) -> ::parsel::Span {
-                        self.span
-                    }
-
-                    pub fn set_span(&mut self, span: ::parsel::Span) {
-                        self.span = span;
-                    }
-
-                    pub fn token(&self) -> ::parsel::ast::Ident {
-                        ::parsel::ast::Ident::new(::core::stringify!($kw), self.span)
-                    }
-                }
-
-                impl ::core::default::Default for $name {
-                    fn default() -> Self {
-                        Self::new(::parsel::Span::call_site())
-                    }
-                }
-
-                impl ::core::convert::From<$name> for ::parsel::proc_macro2::TokenTree {
-                    fn from(kw: $name) -> Self {
-                        ::parsel::proc_macro2::TokenTree::Ident(kw.token())
-                    }
-                }
-
-                impl ::core::convert::AsRef<::core::primitive::str> for $name {
-                    fn as_ref(&self) -> &::core::primitive::str {
-                        self.as_str()
-                    }
-                }
-
-                // These traits are implemented manually because `Span: !PartialEq + !Hash`
-                impl<T> ::core::cmp::PartialEq<T> for $name
-                where
-                    T: ::core::convert::AsRef<::core::primitive::str>
-                {
-                    fn eq(&self, other: &T) -> bool {
-                        self.as_str() == ::core::convert::AsRef::as_ref(other)
-                    }
-                }
-
-                impl ::core::cmp::Eq for $name {}
-
-                impl<T> ::core::cmp::PartialOrd<T> for $name
-                where
-                    T: ::core::convert::AsRef<::core::primitive::str>
-                {
-                    fn partial_cmp(&self, other: &T) -> ::core::option::Option<::core::cmp::Ordering> {
-                        ::core::option::Option::Some(
-                            ::core::cmp::Ord::cmp(self.as_str(), ::core::convert::AsRef::as_ref(other))
-                        )
-                    }
-                }
-
-                impl ::core::cmp::Ord for $name {
-                    fn cmp(&self, other: &Self) -> ::core::cmp::Ordering {
-                        ::core::cmp::Ordering::Equal
-                    }
-                }
-
-                impl ::core::hash::Hash for $name {
-                    fn hash<H>(&self, _state: &mut H) {}
-                }
-
-                impl ::core::fmt::Debug for $name {
-                    fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-                        ::core::fmt::Display::fmt(::core::stringify!($kw), formatter)
-                    }
-                }
-
-                impl ::core::fmt::Display for $name {
-                    fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-                        formatter.pad(::core::stringify!($kw))
-                    }
-                }
-
-                impl ::core::str::FromStr for $name {
-                    type Err = ::parsel::Error;
-
-                    fn from_str(string: &::core::primitive::str) -> ::parsel::Result<Self> {
-                        ::parsel::parse_str(string)
-                    }
-                }
-
-                impl ::parsel::Parse for $name {
-                    fn parse(input: ::parsel::syn::parse::ParseStream<'_>) -> ::parsel::Result<Self> {
-                        let ident: ::parsel::ast::Ident = input.call(::parsel::syn::ext::IdentExt::parse_any)?;
-                        let span = ident.span();
-
-                        if ident == ::core::stringify!($kw) {
-                            ::parsel::Result::Ok($name { span })
-                        } else {
-                            let message = ::core::concat!("expected keyword `", ::core::stringify!($kw), "`");
-
-                            ::parsel::Result::Err(
-                                ::parsel::Error::new(span, message)
-                            )
-                        }
-                    }
-                }
-
-                impl ::parsel::ToTokens for $name {
-                    fn to_tokens(&self, tokens: &mut ::parsel::TokenStream) {
-                        ::parsel::quote::TokenStreamExt::append(tokens, self.token());
-                    }
-                }
-            )*
+            $(::parsel::define_keywords!(@private ::core::stringify!($kw) => $name;);)*
+            $(::parsel::define_keywords!(@private "_" => $underscore_name;);)?
 
             #[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
             pub struct Keywords;
@@ -380,10 +276,139 @@ macro_rules! define_keywords {
             impl ::parsel::ast::KeywordList for Keywords {
                 const KEYWORDS: &'static [&'static ::core::primitive::str] = &[
                     $(::core::stringify!($kw),)*
+                    // the closure-in-tuple is a trick to use the `$underscore_name` matcher
+                    // for performing the `?` repetition, yet avoid having to actually use
+                    // it (or provide a `Span`, which isn't possible in a `const` context),
+                    // and finally do all of this in a `const`-friendly manner.
+                    $(("_", |span| $underscore_name { span }).0)?
                 ];
             }
         }
-    }
+    };
+
+    // the following rule is private, and it must **not** be called directly by user code
+    (@private $string:expr => $name:ident;) => {
+        #[derive(Clone, Copy)]
+        pub struct $name {
+            span: ::parsel::Span,
+        }
+
+        impl $name {
+            pub const fn new(span: ::parsel::Span) -> Self {
+                $name { span }
+            }
+
+            pub const fn as_str(&self) -> &'static ::core::primitive::str {
+                $string
+            }
+
+            pub const fn span(&self) -> ::parsel::Span {
+                self.span
+            }
+
+            pub fn set_span(&mut self, span: ::parsel::Span) {
+                self.span = span;
+            }
+
+            pub fn token(&self) -> ::parsel::ast::Ident {
+                ::parsel::ast::Ident::new($string, self.span)
+            }
+        }
+
+        impl ::core::default::Default for $name {
+            fn default() -> Self {
+                Self::new(::parsel::Span::call_site())
+            }
+        }
+
+        impl ::core::convert::From<$name> for ::parsel::proc_macro2::TokenTree {
+            fn from(kw: $name) -> Self {
+                ::parsel::proc_macro2::TokenTree::Ident(kw.token())
+            }
+        }
+
+        impl ::core::convert::AsRef<::core::primitive::str> for $name {
+            fn as_ref(&self) -> &::core::primitive::str {
+                self.as_str()
+            }
+        }
+
+        // These traits are implemented manually because `Span: !PartialEq + !Hash`
+        impl<T> ::core::cmp::PartialEq<T> for $name
+        where
+            T: ::core::convert::AsRef<::core::primitive::str>
+        {
+            fn eq(&self, other: &T) -> bool {
+                self.as_str() == ::core::convert::AsRef::as_ref(other)
+            }
+        }
+
+        impl ::core::cmp::Eq for $name {}
+
+        impl<T> ::core::cmp::PartialOrd<T> for $name
+        where
+            T: ::core::convert::AsRef<::core::primitive::str>
+        {
+            fn partial_cmp(&self, other: &T) -> ::core::option::Option<::core::cmp::Ordering> {
+                ::core::option::Option::Some(
+                    ::core::cmp::Ord::cmp(self.as_str(), ::core::convert::AsRef::as_ref(other))
+                )
+            }
+        }
+
+        impl ::core::cmp::Ord for $name {
+            fn cmp(&self, other: &Self) -> ::core::cmp::Ordering {
+                ::core::cmp::Ordering::Equal
+            }
+        }
+
+        impl ::core::hash::Hash for $name {
+            fn hash<H>(&self, _state: &mut H) {}
+        }
+
+        impl ::core::fmt::Debug for $name {
+            fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                ::core::fmt::Display::fmt($string, formatter)
+            }
+        }
+
+        impl ::core::fmt::Display for $name {
+            fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                formatter.pad($string)
+            }
+        }
+
+        impl ::core::str::FromStr for $name {
+            type Err = ::parsel::Error;
+
+            fn from_str(string: &::core::primitive::str) -> ::parsel::Result<Self> {
+                ::parsel::parse_str(string)
+            }
+        }
+
+        impl ::parsel::Parse for $name {
+            fn parse(input: ::parsel::syn::parse::ParseStream<'_>) -> ::parsel::Result<Self> {
+                let ident: ::parsel::ast::Ident = input.call(::parsel::syn::ext::IdentExt::parse_any)?;
+                let span = ident.span();
+
+                if ident == $string {
+                    ::parsel::Result::Ok($name { span })
+                } else {
+                    let message = ::core::concat!("expected keyword `", $string, "`");
+
+                    ::parsel::Result::Err(
+                        ::parsel::Error::new(span, message)
+                    )
+                }
+            }
+        }
+
+        impl ::parsel::ToTokens for $name {
+            fn to_tokens(&self, tokens: &mut ::parsel::TokenStream) {
+                ::parsel::quote::TokenStreamExt::append(tokens, self.token());
+            }
+        }
+    };
 }
 
 /// Always parses succesfully, consuming no tokens. Emits nothing when printed.
