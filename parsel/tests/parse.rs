@@ -109,7 +109,7 @@ fn parse_generic_type() -> Result<()> {
     #[derive(PartialEq, Eq, Debug, Parse)]
     struct GenericStruct<T: Dummy, U> {
         namespace: U,
-        colon2: token::Colon2,
+        path_sep: token::PathSep,
         name: T::Assoc,
     }
 
@@ -117,7 +117,7 @@ fn parse_generic_type() -> Result<()> {
         = parsel::parse_str(r#"my_ns :: "lorem ipsum""#)?;
     let expected_struct = GenericStruct {
         namespace: ident("my_ns"),
-        colon2: Default::default(),
+        path_sep: Default::default(),
         name: LitStr::from("lorem ipsum"),
     };
     test_assert_eq!(actual_struct, expected_struct);
@@ -157,12 +157,12 @@ fn parse_recursive_type() -> Result<()> {
     enum Expr {
         Add {
             lhs: MulExpr,
-            op: token::Add,
+            op: token::Plus,
             rhs: MulExpr,
         },
         Sub {
             lhs: MulExpr,
-            op: token::Sub,
+            op: token::Minus,
             rhs: MulExpr,
         },
         Mul(MulExpr),
@@ -177,7 +177,7 @@ fn parse_recursive_type() -> Result<()> {
         },
         Div {
             lhs: Term,
-            op: token::Div,
+            op: token::Slash,
             rhs: Term,
         },
         Term(Term),
@@ -235,7 +235,7 @@ fn parse_recursive_type() -> Result<()> {
         Lit(LitBool),
         Var(Ident),
         Neg {
-            bang: token::Bang,
+            bang: token::Not,
             #[parsel(recursive)]
             subexpr: Box<Predicate>,
         },

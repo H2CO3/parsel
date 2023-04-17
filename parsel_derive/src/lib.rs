@@ -8,7 +8,7 @@
        non_ascii_idents, noop_method_call, pointer_structural_match, single_use_lifetimes,
        trivial_casts, trivial_numeric_casts, unsafe_op_in_unsafe_fn, unused_extern_crates,
        unused_import_braces, unused_lifetimes, unused_qualifications, unused_results,
-       variant_size_differences)]
+       variant_size_differences, let_underscore_drop)]
 #![warn(clippy::cast_lossless, clippy::cast_possible_truncation, clippy::cast_possible_wrap,
         clippy::cast_precision_loss, clippy::cast_ptr_alignment, clippy::cast_sign_loss,
         clippy::checked_conversions, clippy::cloned_instead_of_copied,
@@ -26,7 +26,7 @@
         clippy::inconsistent_struct_constructor, clippy::inefficient_to_string,
         clippy::inline_always, clippy::invalid_upcast_comparisons,
         clippy::items_after_statements, clippy::large_digit_groups,
-        clippy::let_underscore_drop, clippy::linkedlist, clippy::lossy_float_literal,
+        clippy::linkedlist, clippy::lossy_float_literal,
         clippy::macro_use_imports, clippy::manual_ok_or, clippy::many_single_char_names,
         clippy::map_err_ignore, clippy::map_unwrap_or, clippy::match_bool,
         clippy::match_on_vec_items, clippy::match_same_arms, clippy::match_wild_err_arm,

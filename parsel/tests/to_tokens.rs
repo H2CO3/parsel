@@ -81,7 +81,7 @@ fn print_enum() -> Result<()> {
         Literal(Lit),
         Add {
             lhs: Lit,
-            op: token::Add,
+            op: token::Plus,
             rhs: Lit,
         },
     }
@@ -176,7 +176,7 @@ fn print_recursive_type() -> Result<()> {
         Add {
             #[parsel(recursive)]
             lhs: Box<Expr>,
-            op: token::Add,
+            op: token::Plus,
             #[parsel(recursive)]
             rhs: Box<Expr>,
         },
@@ -238,14 +238,14 @@ fn print_recursive_type() -> Result<()> {
     #[derive(PartialEq, Eq, Debug, ToTokens)]
     enum MutuallyRecursiveOne {
         Positive(
-            token::Add,
+            token::Plus,
             // This doesn't _need_ to be marked as recursive, but it can.
             // It is enough to break the constraint cycle at one single type,
             // but omitting the other constraint doesn't hurt, either.
             MutuallyRecursiveTwo,
         ),
         Negative {
-            sign: token::Sub,
+            sign: token::Minus,
             num: MutuallyRecursiveTwo,
         },
         Nothing,
@@ -263,7 +263,7 @@ fn print_recursive_type() -> Result<()> {
         MutuallyRecursiveTwo {
             number: LitUint::from(11111_u64),
             next: Box::new(MutuallyRecursiveOne::Negative {
-                sign: token::Sub::default(),
+                sign: token::Minus::default(),
                 num: MutuallyRecursiveTwo {
                     number: LitUint::from(0_u64),
                     next: Box::new(MutuallyRecursiveOne::Nothing),

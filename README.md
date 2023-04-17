@@ -168,7 +168,7 @@ the accompanying comments:
 ```rust
 use parsel::{Parse, ToTokens};
 use parsel::ast::{Paren, LitBool};
-use parsel::ast::token::{Or, And, Bang};
+use parsel::ast::token::{Or, And, Not};
 
 #[derive(PartialEq, Eq, Debug, Parse, ToTokens)]
 enum Expr {
@@ -196,7 +196,7 @@ enum Conjunction {
 enum Term {
     Literal(LitBool),
     Not(
-        Bang,
+        Not,
         #[parsel(recursive)] // break direct recursion
         Box<Term>,
     ),
@@ -225,7 +225,7 @@ assert_eq!(
             }))),
             op: And::default(),
             rhs: Box::new(Conjunction::Term(Term::Not(
-                Bang::default(),
+                Not::default(),
                 Box::new(Term::Literal(LitBool::from(false))),
             ))),
         })

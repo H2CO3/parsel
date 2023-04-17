@@ -12,16 +12,17 @@ use crate::util::add_bounds;
 /// Actual implementation of `#[derive(ToTokens)]`.
 pub fn expand(stream: TokenStream) -> Result<TokenStream> {
     let item: DeriveInput = syn::parse2(stream)?;
-    let ty_name = &item.ident;
+    let ty_name = item.ident.clone();
 
     let body = match &item.data {
         Data::Union(_) => return Err(Error::new_spanned(&item, "unions are not supported")),
-        Data::Enum(data) => expand_enum(ty_name, data)?,
+        Data::Enum(data) => expand_enum(&ty_name, data)?,
         Data::Struct(data) => expand_struct(data)?,
     };
-    let (impl_gen, ty_gen, where_clause) = item.generics.split_for_impl();
+    let generics = item.generics.clone();
+    let (impl_gen, ty_gen, where_clause) = generics.split_for_impl();
     let bounds = parse_quote!(::parsel::ToTokens);
-    let where_clause = add_bounds(&item, where_clause, bounds)?;
+    let where_clause = add_bounds(item, where_clause, bounds)?;
 
     Ok(quote!{
         #[automatically_derived]

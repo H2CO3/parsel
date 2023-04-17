@@ -982,8 +982,8 @@ pub struct Paren<T> {
 }
 
 impl<T> Paren<T> {
-    pub const fn new(inner: T, span: Span) -> Self {
-        let parens = token::Paren { span };
+    pub fn new(inner: T, span: Span) -> Self {
+        let parens = token::Paren(span);
         Paren { parens, inner }
     }
 
@@ -1110,8 +1110,8 @@ pub struct Bracket<T> {
 }
 
 impl<T> Bracket<T> {
-    pub const fn new(inner: T, span: Span) -> Self {
-        let brackets = token::Bracket { span };
+    pub fn new(inner: T, span: Span) -> Self {
+        let brackets = token::Bracket(span);
         Bracket { brackets, inner }
     }
 
@@ -1245,8 +1245,8 @@ pub struct Brace<T> {
 }
 
 impl<T> Brace<T> {
-    pub const fn new(inner: T, span: Span) -> Self {
-        let braces = token::Brace { span };
+    pub fn new(inner: T, span: Span) -> Self {
+        let braces = token::Brace(span);
         Brace { braces, inner }
     }
 
@@ -1499,7 +1499,10 @@ where
     }
 }
 
-impl<T, P> Extend<Pair<T, P>> for Punctuated<T, P> {
+impl<T, P> Extend<Pair<T, P>> for Punctuated<T, P>
+where
+    P: Default
+{
     fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = Pair<T, P>>
@@ -1654,21 +1657,21 @@ pub type Many<T> = Punctuated<T, NotEof>;
 /// ```rust
 /// use parsel::Result;
 /// use parsel::ast::{ident, LitInt, Ident, Separated, Many};
-/// use parsel::ast::token::{Add, Colon2, Comma};
+/// use parsel::ast::token::{Plus, PathSep, Comma};
 ///
-/// let mut sum: Separated<LitInt, Add> = parsel::parse_quote! {
+/// let mut sum: Separated<LitInt, Plus> = parsel::parse_quote! {
 ///     1 + 2 + 4 + 8 + 16 + 32
 /// };
 /// sum.push_value(LitInt::from(64));
 ///
 /// assert_eq!(sum.to_string(), "1 + 2 + 4 + 8 + 16 + 32 + 64");
 ///
-/// let good_short: Separated<Ident, Colon2> = parsel::parse_quote!(one);
+/// let good_short: Separated<Ident, PathSep> = parsel::parse_quote!(one);
 /// let good_short: Vec<_> = good_short.into_iter().collect();
 /// let expected_short = vec![ident("one")];
 /// assert_eq!(good_short, expected_short);
 ///
-/// let good_long: Separated<Ident, Colon2> = parsel::parse_quote! {
+/// let good_long: Separated<Ident, PathSep> = parsel::parse_quote! {
 ///     root::module::Item
 /// };
 /// let good_long: Vec<_> = good_long.into_iter().collect();
@@ -1676,12 +1679,12 @@ pub type Many<T> = Punctuated<T, NotEof>;
 /// let expected_long: Vec<_> = expected_long.into_iter().collect();
 /// assert_eq!(good_long, expected_long);
 ///
-/// let bad_trailing: Result<Separated<Ident, Colon2>> = parsel::parse_str(r"
+/// let bad_trailing: Result<Separated<Ident, PathSep>> = parsel::parse_str(r"
 ///     root::module::Item::
 /// ");
 /// assert!(bad_trailing.is_err());
 ///
-/// let bad_empty: Result<Separated<Ident, Colon2>> = parsel::parse_str("");
+/// let bad_empty: Result<Separated<Ident, PathSep>> = parsel::parse_str("");
 /// assert!(bad_empty.is_err());
 /// ```
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -1784,9 +1787,9 @@ impl<T, P> Separated<T, P> {
         // this subtraction cannot overflow: `self` is never empty
         let mut pairs = Vec::with_capacity(self.len().get() - 1);
         let mut iter = self.into_pairs();
-        let pair = iter.next().expect("empty Separated");
+        let first_pair = iter.next().expect("empty Separated");
 
-        let (first, mut punct) = match pair {
+        let (first, mut punct) = match first_pair {
             Pair::Punctuated(value, punct) => (value, punct),
             Pair::End(value) => return (value, pairs),
         };
@@ -3180,6 +3183,7 @@ impl TryFrom<syn::Lit> for Lit {
             syn::Lit::Verbatim(lit) => {
                 Err(Error::new(lit.span(), format!("unparseable literal `{:?}`", lit)))
             }
+            _ => Err(Error::new(lit.span(), format!("unhandled literal `{:?}`", lit)))
         }
     }
 }
@@ -3268,14 +3272,14 @@ impl ToTokens for Lit {
 /// # use parsel::ast::{token, ident};
 /// #[derive(PartialEq, Eq, Debug, Parse, ToTokens)]
 /// enum AddOp {
-///     Add(token::Add),
-///     Sub(token::Sub),
+///     Add(token::Plus),
+///     Sub(token::Minus),
 /// }
 ///
 /// #[derive(PartialEq, Eq, Debug, Parse, ToTokens)]
 /// enum MulOp {
 ///     Mul(token::Star),
-///     Div(token::Div),
+///     Div(token::Slash),
 /// }
 ///
 /// #[derive(PartialEq, Eq, Debug, Parse, ToTokens)]
