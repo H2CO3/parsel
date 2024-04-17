@@ -1,7 +1,7 @@
 [package]
 name          = "parsel_derive"
-version       = "0.12.0"
-edition       = "2018"
+version       = "0.13.0"
+edition       = "2021"
 authors       = ["Árpád Goretity <h2co3@h2co3.org>"]
 repository    = "https://github.com/H2CO3/parsel/"
 homepage      = "https://h2co3.github.io/parsel/"
@@ -16,7 +16,7 @@ keywords      = ["compiler", "parser", "generator", "syntax", "ast"]
 proc-macro = true
 
 [dependencies]
-proc-macro2 = { version = "1.0.56", features = ["span-locations"] }
-syn = { version = "2.0.15", features = ["extra-traits"] }
-quote = "1.0.26"
+proc-macro2 = { version = "1.0.81", features = ["span-locations"] }
+syn = { version = "2.0.59", features = ["extra-traits"] }
+quote = "1.0.36"
 deluxe = "0.5.0"

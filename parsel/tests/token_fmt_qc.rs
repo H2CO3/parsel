@@ -1,7 +1,8 @@
 use std::iter;
 use proc_macro2::{TokenStream, TokenTree, Span};
 use proc_macro2::{Ident, Literal, Group, Delimiter, Punct, Spacing};
-use quickcheck::{quickcheck, TestResult, Arbitrary, Gen};
+use quickcheck::{TestResult, Arbitrary, Gen};
+use quickcheck_macros::quickcheck;
 use parsel::util::TokenStreamFormatter;
 
 #[derive(Clone, Debug)]
@@ -119,21 +120,20 @@ impl Arbitrary for TokenStreamGen {
     }
 }
 
-quickcheck! {
-    fn parse_pretty_printed_is_identity(stream: TokenStreamGen) -> TestResult {
-        let TokenStreamGen(stream) = stream;
-        let mut pretty = String::new();
-        let mut fmt = TokenStreamFormatter::new(&mut pretty);
+#[quickcheck]
+fn parse_pretty_printed_is_identity(stream: TokenStreamGen) -> TestResult {
+    let TokenStreamGen(stream) = stream;
+    let mut pretty = String::new();
+    let mut fmt = TokenStreamFormatter::new(&mut pretty);
 
-        if let Err(error) = fmt.write(stream.clone()) {
-            return TestResult::error(error.to_string());
-        }
-
-        let parsed: TokenStream = match pretty.parse() {
-            Ok(ts) => ts,
-            Err(error) => return TestResult::error(error.to_string()),
-        };
-
-        TestResult::from_bool(stream.to_string() == parsed.to_string())
+    if let Err(error) = fmt.write(stream.clone()) {
+        return TestResult::error(error.to_string());
     }
+
+    let parsed: TokenStream = match pretty.parse() {
+        Ok(ts) => ts,
+        Err(error) => return TestResult::error(error.to_string()),
+    };
+
+    TestResult::from_bool(stream.to_string() == parsed.to_string())
 }

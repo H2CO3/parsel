@@ -1,6 +1,6 @@
 ## Parsel, the Zero-Code Parser Generator
 
-[![MSRV](https://img.shields.io/badge/MSRV-1.56.1-green)](https://github.com/H2CO3/Parsel)
+[![MSRV](https://img.shields.io/badge/MSRV-1.77.0-green)](https://github.com/H2CO3/Parsel)
 
 Parsel is a library for generating parsers directly from syntax tree node types.
 
