@@ -991,7 +991,7 @@ impl<T> Paren<T> {
         self.inner
     }
 
-    pub fn as_parens(&self) -> &token::Paren {
+    pub const fn as_parens(&self) -> &token::Paren {
         &self.parens
     }
 
@@ -999,7 +999,7 @@ impl<T> Paren<T> {
         self.parens
     }
 
-    pub fn as_parts(&self) -> (&token::Paren, &T) {
+    pub const fn as_parts(&self) -> (&token::Paren, &T) {
         let Paren { parens, inner } = self;
         (parens, inner)
     }
@@ -1119,7 +1119,7 @@ impl<T> Bracket<T> {
         self.inner
     }
 
-    pub fn as_brackets(&self) -> &token::Bracket {
+    pub const fn as_brackets(&self) -> &token::Bracket {
         &self.brackets
     }
 
@@ -1127,7 +1127,7 @@ impl<T> Bracket<T> {
         self.brackets
     }
 
-    pub fn as_parts(&self) -> (&token::Bracket, &T) {
+    pub const fn as_parts(&self) -> (&token::Bracket, &T) {
         let Bracket { brackets, inner } = self;
         (brackets, inner)
     }
@@ -1254,7 +1254,7 @@ impl<T> Brace<T> {
         self.inner
     }
 
-    pub fn as_braces(&self) -> &token::Brace {
+    pub const fn as_braces(&self) -> &token::Brace {
         &self.braces
     }
 
@@ -1262,7 +1262,7 @@ impl<T> Brace<T> {
         self.braces
     }
 
-    pub fn as_parts(&self) -> (&token::Brace, &T) {
+    pub const fn as_parts(&self) -> (&token::Brace, &T) {
         let Brace { braces, inner } = self;
         (braces, inner)
     }
@@ -2344,7 +2344,7 @@ macro_rules! impl_literal {
         }
 
         impl $name {
-            pub fn new(value: $raw, span: Span) -> Self {
+            pub const fn new(value: $raw, span: Span) -> Self {
                 $name { value, span }
             }
 
@@ -2356,7 +2356,7 @@ macro_rules! impl_literal {
                 self.value
             }
 
-            pub fn span(&self) -> Span {
+            pub const fn span(&self) -> Span {
                 self.span
             }
 
@@ -2462,8 +2462,8 @@ macro_rules! impl_literal {
 impl_literal!{
     bool        => LitBool;
     u8          => LitByte;
-    i64        => LitInt;
-    u64        => LitUint;
+    i64         => LitInt;
+    u64         => LitUint;
     NotNan<f64> => LitFloat;
     char        => LitChar;
     String      => LitStr;
@@ -2980,7 +2980,7 @@ pub enum Lit {
 }
 
 impl Lit {
-    pub fn span(&self) -> Span {
+    pub const fn span(&self) -> Span {
         match self {
             Lit::Bool(lit)    => lit.span(),
             Lit::Byte(lit)    => lit.span(),
@@ -3699,11 +3699,11 @@ impl<L, R> Either<L, R> {
         }
     }
 
-    pub fn is_left(&self) -> bool {
+    pub const fn is_left(&self) -> bool {
         matches!(self, Either::Left(_))
     }
 
-    pub fn is_right(&self) -> bool {
+    pub const fn is_right(&self) -> bool {
         matches!(self, Either::Right(_))
     }
 
@@ -3721,7 +3721,7 @@ impl<L, R> Either<L, R> {
         }
     }
 
-    pub fn as_ref(&self) -> Either<&L, &R> {
+    pub const fn as_ref(&self) -> Either<&L, &R> {
         match *self {
             Either::Left(ref left)   => Either::Left(left),
             Either::Right(ref right) => Either::Right(right),
