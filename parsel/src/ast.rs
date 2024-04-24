@@ -2414,6 +2414,7 @@ macro_rules! impl_literal {
         impl Eq for $name {}
 
         impl PartialOrd<Self> for $name {
+            #[allow(clippy::non_canonical_partial_ord_impl)]
             fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
                 self.cmp(other).into()
             }

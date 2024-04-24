@@ -8,6 +8,7 @@ use syn::parse::{ParseStream, discouraged::Speculative};
 use quote::ToTokens;
 use crate::{Error, Result, Span, Spanned, LineColumn};
 
+
 /// Similar to `syn::parse_quote!`, but instead of panicking, it returns an
 /// `Err` if the inferred type fails to parse from the specified token stream.
 ///
@@ -92,20 +93,20 @@ macro_rules! try_parse_quote_spanned {
 /// Extension trait for formatting the span of AST nodes in a human-readable manner,
 /// and for (re-)computing byte offsets into the source based on the line/column
 /// location, since this information is not exposed by the public API of `Span`.
-pub trait SpannedExt: Spanned {
-    fn format_span(&self) -> SpanDisplay;
+///
+/// This does not impose `Spanned` as a supertrait so that any type that reasonably
+/// implements [`SpannedExt::span()`] should be able to implement it, without having
+/// to implement `ToTokens` (directly implementing [`Spanned`] is not possible, as
+/// it is sealed as of Syn 2.0.)
+pub trait SpannedExt {
+    fn span(&self) -> Span;
 
-    fn byte_range(&self, source: &str) -> Range<usize>;
-
-    fn char_range(&self, source: &str) -> Range<usize>;
-}
-
-impl<T> SpannedExt for T
-where
-    T: ?Sized + Spanned
-{
     fn format_span(&self) -> SpanDisplay {
         SpanDisplay::new(self.span())
+    }
+
+    fn source_substring<'s>(&self, source: &'s str) -> &'s str {
+        &source[self.byte_range(source)]
     }
 
     /// TODO(H2CO3): a faster, less naive implementation would be great.
@@ -170,6 +171,15 @@ where
         let end = char_offset(source, span.end());
 
         start..end
+    }
+}
+
+impl<T> SpannedExt for T
+where
+    T: ?Sized + Spanned
+{
+    fn span(&self) -> Span {
+        Spanned::span(self)
     }
 }
 
