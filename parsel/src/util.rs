@@ -544,7 +544,9 @@ impl<W> TokenStreamFormatter<&'static str, W> {
     }
 }
 
-/// Helper for implementing `Display` in terms of `ToTokens`.
+/// Helper for reasonably pretty printing any general type that implements `ToTokens`.
+///
+/// See [`TokenStreamFormatter`] for an explanation of how this is achieved, and caveats.
 pub fn pretty_print_tokens<T, W>(node: &T, writer: W) -> fmt::Result
 where
     T: ?Sized + ToTokens,
@@ -552,4 +554,25 @@ where
 {
     let mut formatter = TokenStreamFormatter::new(writer);
     formatter.write_node(node)
+}
+
+/// Helper for implementing `Display` in terms of `ToTokens`,
+/// respecting the alternate flag:
+///
+/// * if the flag is unset, continue pretty-printing the token stream
+///   with indentation and line breaks
+/// * if the flag is set, simply forward to the `Display` impl of
+///   `TokenStream`, which does not print newlines or indentation.
+///
+/// This is because it's sometimes desirable to format short token
+/// streams inline, e.g. in parser/compiler error messages.
+pub fn format_token_stream<T>(node: &T, formatter: &mut Formatter<'_>) -> fmt::Result
+where
+    T: ?Sized + ToTokens,
+{
+    if formatter.alternate() {
+        Display::fmt(&node.to_token_stream(), formatter)
+    } else {
+        pretty_print_tokens(node, formatter)
+    }
 }

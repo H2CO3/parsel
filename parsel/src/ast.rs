@@ -22,7 +22,7 @@ use syn::parse::{Error, Result, Parse, ParseStream};
 use syn::parse::discouraged::Speculative;
 use syn::punctuated::{Pair, IntoIter, Iter, IterMut, IntoPairs, Pairs, PairsMut};
 use quote::{ToTokens, TokenStreamExt};
-use crate::util::pretty_print_tokens;
+use crate::util::format_token_stream;
 
 pub use proc_macro2::Ident;
 pub use syn::Token;
@@ -896,7 +896,7 @@ where
     T: ToTokens,
 {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        pretty_print_tokens(self, formatter)
+        format_token_stream(self, formatter)
     }
 }
 
@@ -1051,7 +1051,7 @@ impl<T> AsMut<T> for Paren<T> {
 
 impl<T: ToTokens> Display for Paren<T> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        pretty_print_tokens(self, formatter)
+        format_token_stream(self, formatter)
     }
 }
 
@@ -1179,7 +1179,7 @@ impl<T> AsMut<T> for Bracket<T> {
 
 impl<T: ToTokens> Display for Bracket<T> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        pretty_print_tokens(self, formatter)
+        format_token_stream(self, formatter)
     }
 }
 
@@ -1314,7 +1314,7 @@ impl<T> AsMut<T> for Brace<T> {
 
 impl<T: ToTokens> Display for Brace<T> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        pretty_print_tokens(self, formatter)
+        format_token_stream(self, formatter)
     }
 }
 
@@ -1568,7 +1568,7 @@ where
     P: ToTokens,
 {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        pretty_print_tokens(self, formatter)
+        format_token_stream(self, formatter)
     }
 }
 
@@ -1982,7 +1982,7 @@ where
     P: ToTokens,
 {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        pretty_print_tokens(self, formatter)
+        format_token_stream(self, formatter)
     }
 }
 
@@ -2289,7 +2289,7 @@ where
     T: ToTokens
 {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        pretty_print_tokens(self, formatter)
+        format_token_stream(self, formatter)
     }
 }
 
@@ -3404,7 +3404,7 @@ where
     R: ToTokens,
 {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        pretty_print_tokens(self, formatter)
+        format_token_stream(self, formatter)
     }
 }
 
@@ -3597,7 +3597,7 @@ where
     L: ToTokens,
 {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        pretty_print_tokens(self, formatter)
+        format_token_stream(self, formatter)
     }
 }
 
