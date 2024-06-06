@@ -356,67 +356,10 @@ where
 /// Helper type for correctly and reasonably "pretty"-printing any `TokenStream` in
 /// a grammar- and language-agnostic way. This mostly means dealing with parentheses,
 /// so that nested structures don't end up on one single long line.
-///
-/// Of course, it is not possible to perform pretty-printing in a completely generic
-/// manner, but the primary purpose of this mechanism is not that -- it's merely trying
-/// to be a useful debugging tool, of which the results are less unnecessarily verbose,
-/// and therefore easier to read, than the output of `#[derive(Debug)]`.
-///
-/// ```rust
-/// use parsel::util::TokenStreamFormatter;
-/// use parsel::quote::quote;
-///
-/// let ts = quote!{
-///     [
-///         [
-///             7.43 * {
-///                 zzz (
-///                     3333 + "52" - 'a / [
-///                         foo bar || &baz;
-///                     ]
-///                 ) != 5;
-///                 ww;
-///                 6 <<= 78 >>= 951,
-///                 $ foo $bar #![attribute]
-///             },
-///             x, y
-///         ]
-///     ]
-/// };
-///
-/// let mut string = String::new();
-/// let mut fmt = TokenStreamFormatter::new(&mut string);
-/// fmt.write(ts)?;
-///
-/// assert_eq!(string, str::trim(r#"
-/// [
-///     [
-///         7.43 * {
-///             zzz (
-///                 3333 + "52" - 'a / [
-///                     foo bar || & baz ;
-///                 ]
-///             )
-///             != 5 ;
-///             ww ;
-///             6 <<= 78 >>= 951 ,
-///             $ foo $ bar # ! [
-///                 attribute
-///             ]
-///         }
-///         ,
-///         x ,
-///         y
-///     ]
-/// ]
-/// "#));
-/// #
-/// # Ok::<(), core::fmt::Error>(())
-/// ```
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct TokenStreamFormatter<S, W> {
     indent_level: usize,
-    indent_string: S,
+    indent_string: Option<S>,
     writer: W,
 }
 
@@ -442,7 +385,7 @@ where
         if indent_string.as_ref().trim().is_empty() {
             Ok(TokenStreamFormatter {
                 indent_level: 0,
-                indent_string,
+                indent_string: Some(indent_string),
                 writer,
             })
         } else {
@@ -456,6 +399,7 @@ where
     S: AsRef<str>,
     W: Write,
 {
+    /// Format a `TokenStream` respecting the specified indentation.
     pub fn write(&mut self, stream: TokenStream) -> fmt::Result {
         self.write_indent()?;
         let mut spacing = Spacing::Joint;
@@ -479,15 +423,15 @@ where
                         (punct.as_char(), spacing, iter.peek()),
                         (',' | ';', Spacing::Alone, Some(_))
                     ) {
-                        writeln!(self.writer)?;
-                        self.write_indent()?;
+                        self.write_newline_and_indent(spacing)?;
                         spacing = Spacing::Joint;
                     }
                 }
                 TokenTree::Group(group) => {
+                    let inner_stream = group.stream();
                     let (open, close) = match group.delimiter() {
                         Delimiter::None => {
-                            self.write(group.stream())?;
+                            self.write(inner_stream)?;
                             continue;
                         }
                         Delimiter::Parenthesis => ('(', ')'),
@@ -496,19 +440,24 @@ where
                     };
 
                     self.writer.write_char(open)?;
-                    self.indent_level += 1;
-                    writeln!(self.writer)?;
 
-                    self.write(group.stream())?;
+                    // If the inside of the group is empty, do not write
+                    // newlines and indentation, just the delimiters.
+                    // NOTE: this _also_ applies when _not_ pretty-printing.
+                    if !inner_stream.is_empty() {
+                        self.indent_level += 1;
+                        self.write_newline(Spacing::Joint)?;
 
-                    self.indent_level -= 1;
-                    writeln!(self.writer)?;
-                    self.write_indent()?;
+                        self.write(inner_stream)?;
+
+                        self.indent_level -= 1;
+                        self.write_newline_and_indent(Spacing::Joint)?;
+                    }
+
                     self.writer.write_char(close)?;
 
                     if iter.peek().is_some() {
-                        writeln!(self.writer)?;
-                        self.write_indent()?;
+                        self.write_newline_and_indent(spacing)?;
                         spacing = Spacing::Joint;
                     }
                 }
@@ -518,7 +467,9 @@ where
         Ok(())
     }
 
-    pub fn write_node<T>(&mut self, node: &T) -> fmt::Result
+    /// Format an AST node, i.e., a value of a type that implements `ToTokens`,
+    /// respecting the specified indentation.
+    pub fn write_ast_node<T>(&mut self, node: &T) -> fmt::Result
     where
         T: ?Sized + ToTokens,
     {
@@ -526,19 +477,151 @@ where
     }
 
     fn write_indent(&mut self) -> fmt::Result {
-        for _ in 0..self.indent_level {
-            self.writer.write_str(self.indent_string.as_ref())?;
+        if let Some(indent_string) = self.indent_string.as_ref() {
+            let indent_string: &str = indent_string.as_ref();
+
+            for _ in 0..self.indent_level {
+                self.writer.write_str(indent_string)?;
+            }
         }
 
         Ok(())
     }
+
+    fn write_newline(&mut self, spacing: Spacing) -> fmt::Result {
+        if self.indent_string.is_some() {
+            writeln!(self.writer)
+        } else if spacing == Spacing::Alone {
+            self.writer.write_char(' ')
+        } else {
+            Ok(())
+        }
+    }
+
+    fn write_newline_and_indent(&mut self, spacing: Spacing) -> fmt::Result {
+        self.write_newline(spacing)?;
+        self.write_indent()
+    }
 }
 
 impl<W> TokenStreamFormatter<&'static str, W> {
-    pub const fn new(writer: W) -> Self {
+    /// Constructor for a pretty-printing `TokenStreamFormatter` with reasonable defaults.
+    ///
+    /// Of course, it is not possible to perform pretty-printing in a completely generic
+    /// manner, but the primary purpose of this mechanism is not that -- it's merely trying
+    /// to be a useful debugging tool, of which the results are less unnecessarily verbose,
+    /// and therefore easier to read, than the output of `#[derive(Debug)]`.
+    ///
+    /// ```rust
+    /// use parsel::util::TokenStreamFormatter;
+    /// use parsel::quote::quote;
+    ///
+    /// let ts = quote!{
+    ///     [
+    ///         [
+    ///             7.43 * {
+    ///                 zzz (
+    ///                     3333 + "52" - 'a / [
+    ///                         foo bar || &baz;
+    ///                     ]
+    ///                 ) != 5;
+    ///                 ww;
+    ///                 { }
+    ///                 () +
+    ///                 [
+    ///                     // this is just a comment so the brackets are actually empty
+    ///                 ]
+    ///                 6 <<= 78 >>= 951,
+    ///                 $ foo $bar #![attribute]
+    ///             },
+    ///             x, y
+    ///         ]
+    ///     ]
+    /// };
+    ///
+    /// let mut string = String::new();
+    /// let mut formatter = TokenStreamFormatter::pretty(&mut string);
+    /// formatter.write(ts)?;
+    ///
+    /// assert_eq!(string, str::trim(r#"
+    /// [
+    ///     [
+    ///         7.43 * {
+    ///             zzz (
+    ///                 3333 + "52" - 'a / [
+    ///                     foo bar || & baz ;
+    ///                 ]
+    ///             )
+    ///             != 5 ;
+    ///             ww ;
+    ///             {}
+    ///             ()
+    ///             + []
+    ///             6 <<= 78 >>= 951 ,
+    ///             $ foo $ bar # ! [
+    ///                 attribute
+    ///             ]
+    ///         }
+    ///         ,
+    ///         x ,
+    ///         y
+    ///     ]
+    /// ]
+    /// "#));
+    /// #
+    /// # Ok::<(), core::fmt::Error>(())
+    /// ```
+    pub const fn pretty(writer: W) -> Self {
         TokenStreamFormatter {
             indent_level: 0,
-            indent_string: "    ",
+            indent_string: Some("    "),
+            writer,
+        }
+    }
+
+    /// Constructor for a `TokenStreamFormatter` that does not add indentation.
+    ///
+    /// ```rust
+    /// use parsel::util::TokenStreamFormatter;
+    /// use parsel::quote::quote;
+    ///
+    /// let ts = quote!{
+    ///     [
+    ///         (
+    ///             7.43 * {
+    ///                 zzz (
+    ///                     3333 + "52" - 'a / [
+    ///                         foo || &baz;
+    ///                     ]
+    ///                 ) != 5;
+    ///                 ww;
+    ///                 { }
+    ///                 () +
+    ///                 [
+    ///                     // this is just a comment so the brackets are actually empty
+    ///                 ]
+    ///             },
+    ///             x,
+    ///             y
+    ///         )
+    ///     ]
+    /// };
+    ///
+    /// let mut string = String::new();
+    /// let mut formatter = TokenStreamFormatter::compact(&mut string);
+    /// formatter.write(ts)?;
+    ///
+    /// assert_eq!(
+    ///     string,
+    ///     r#"[(7.43 * {zzz (3333 + "52" - 'a / [foo || & baz ;]) != 5 ; ww ; {} () + []} , x , y)]"#
+    /// );
+    /// #
+    /// # Ok::<(), core::fmt::Error>(())
+    /// ```
+    pub const fn compact(writer: W) -> Self {
+        TokenStreamFormatter {
+            indent_level: 0,
+            indent_string: None,
             writer,
         }
     }
@@ -547,32 +630,67 @@ impl<W> TokenStreamFormatter<&'static str, W> {
 /// Helper for reasonably pretty printing any general type that implements `ToTokens`.
 ///
 /// See [`TokenStreamFormatter`] for an explanation of how this is achieved, and caveats.
-pub fn pretty_print_tokens<T, W>(node: &T, writer: W) -> fmt::Result
+pub fn format_ast_node_pretty<T, W>(node: &T, writer: W) -> fmt::Result
 where
     T: ?Sized + ToTokens,
     W: Write,
 {
-    let mut formatter = TokenStreamFormatter::new(writer);
-    formatter.write_node(node)
+    TokenStreamFormatter::pretty(writer).write_ast_node(node)
+}
+
+/// Helper for compactly printing any general type that implements `ToTokens`.
+pub fn format_ast_node_compact<T, W>(node: &T, writer: W) -> fmt::Result
+where
+    T: ?Sized + ToTokens,
+    W: Write,
+{
+    TokenStreamFormatter::compact(writer).write_ast_node(node)
+}
+
+/// Helper for reasonably pretty printing a `TokenStream`.
+///
+/// See [`TokenStreamFormatter`] for an explanation of how this is achieved, and caveats.
+pub fn format_tokens_pretty<W: Write>(tokens: TokenStream, writer: W) -> fmt::Result {
+    TokenStreamFormatter::pretty(writer).write(tokens)
+}
+
+/// Helper for compactly printing a `TokenStream`.
+pub fn format_tokens_compact<W: Write>(tokens: TokenStream, writer: W) -> fmt::Result {
+    TokenStreamFormatter::compact(writer).write(tokens)
 }
 
 /// Helper for implementing `Display` in terms of `ToTokens`,
 /// respecting the alternate flag:
 ///
+/// * if the flag is set, do NOT include line breaks or indentation
 /// * if the flag is unset, continue pretty-printing the token stream
 ///   with indentation and line breaks
-/// * if the flag is set, simply forward to the `Display` impl of
-///   `TokenStream`, which does not print newlines or indentation.
 ///
 /// This is because it's sometimes desirable to format short token
 /// streams inline, e.g. in parser/compiler error messages.
-pub fn format_token_stream<T>(node: &T, formatter: &mut Formatter<'_>) -> fmt::Result
+pub fn format_ast_node<T>(node: &T, formatter: &mut Formatter<'_>) -> fmt::Result
 where
     T: ?Sized + ToTokens,
 {
     if formatter.alternate() {
-        Display::fmt(&node.to_token_stream(), formatter)
+        format_ast_node_compact(node, formatter)
     } else {
-        pretty_print_tokens(node, formatter)
+        format_ast_node_pretty(node, formatter)
+    }
+}
+
+/// Helper for formatting a `TokenStream`, respecting the alternate flag:
+///
+/// * if the flag is set, do NOT include line breaks or indentation
+/// * if the flag is unset, continue pretty-printing the token stream
+///   with indentation and line breaks
+///
+/// This is because it's sometimes desirable to format short token
+/// streams inline, e.g. in parser/compiler error messages.
+pub fn format_tokens(tokens: TokenStream, formatter: &mut Formatter<'_>) -> fmt::Result {
+    if formatter.alternate() {
+        format_tokens_compact(tokens, formatter)
+    } else {
+        format_tokens_pretty(tokens, formatter)
     }
 }

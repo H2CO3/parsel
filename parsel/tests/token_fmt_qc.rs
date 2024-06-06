@@ -124,7 +124,7 @@ impl Arbitrary for TokenStreamGen {
 fn parse_pretty_printed_is_identity(stream: TokenStreamGen) -> TestResult {
     let TokenStreamGen(stream) = stream;
     let mut pretty = String::new();
-    let mut fmt = TokenStreamFormatter::new(&mut pretty);
+    let mut fmt = TokenStreamFormatter::pretty(&mut pretty);
 
     if let Err(error) = fmt.write(stream.clone()) {
         return TestResult::error(error.to_string());
